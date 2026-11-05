@@ -1,10 +1,23 @@
-import "./globals.css";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-export const metadata: Metadata = { title: "Cinevest", description: "Testnet film financing" };
+import { Providers } from "./providers";
+import "./globals.css";
 
-/** Shared document shell for this application. */
-export default function RootLayout({ children }: { children: ReactNode }) {
-  return <html lang="en"><body>{children}</body></html>;
+export const metadata: Metadata = {
+  title: "CineVest — Film financing onchain",
+  description:
+    "A testnet prototype for transparent film funding and pay-per-view settlement.",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{ children: ReactNode }>) {
+  return (
+    <html lang="en">
+      <body className="min-h-screen bg-background font-sans text-foreground antialiased">
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
 }
