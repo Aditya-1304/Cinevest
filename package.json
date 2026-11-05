@@ -1,0 +1,26 @@
+{
+  "name": "cinevest",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n web,backend \"npm run dev -w @cinevest/web\" \"npm run dev -w @cinevest/backend\"",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint apps packages",
+    "contracts:build": "cd contracts && forge build",
+    "contracts:test": "cd contracts && forge test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3",
+    "eslint": "^9.39.0",
+    "eslint-config-next": "^16.0.0",
+    "@openzeppelin/contracts": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=22.9.0"
+  }
+}
