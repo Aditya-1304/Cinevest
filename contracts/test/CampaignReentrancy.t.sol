@@ -67,6 +67,23 @@ contract CampaignReentrancyTest is CampaignSafetyFixture {
         _solvent(campaign);
     }
 
+    function test_CallbackCannotReenterMeteredViewing() external {
+        vm.etch(address(token), address(new CallbackUSDC()).code);
+        CallbackUSDC callback = CallbackUSDC(address(token));
+        factory.configureMeterSigner(address(0xfeed));
+        Campaign campaign = _create(100e6);
+        _fund(campaign, ALICE, 100e6); _release(campaign);
+        token.mint(BOB, 2e6);
+        vm.prank(BOB); token.approve(address(campaign), 2e6);
+        callback.arm(address(campaign), abi.encodeCall(Campaign.withdrawViewing, ()));
+        vm.prank(BOB); campaign.depositViewing(1e6); _blocked(callback);
+        vm.prank(BOB); campaign.requestViewingExit();
+        vm.warp(block.timestamp + campaign.VIEWING_EXIT_DELAY());
+        callback.arm(address(campaign), abi.encodeCall(Campaign.depositViewing, (1)));
+        vm.prank(BOB); campaign.withdrawViewing(); _blocked(callback);
+        _solvent(campaign);
+    }
+
     function _blocked(CallbackUSDC callback) private view {
         require(callback.attempted() && !callback.nestedSucceeded(), "callback bypass");
         require(callback.nestedError() == bytes4(keccak256("ReentrancyGuardReentrantCall()")), "guard was not reached");

@@ -27,6 +27,7 @@ export async function readCampaignMedia(campaign: `0x${string}`, wallet?: `0x${s
     reviewer: terms.reviewer.toLowerCase(),
     released: stage === RELEASED,
     paid,
+    watchPrice: terms.watchPrice,
     onchainHash: onchainHash.toLowerCase(),
     // Contract rejects configureRelease once final evidence is approved, so the offchain selection locks at the same point.
     locked: stage === RELEASED || stage === CANCELLED_PRODUCTION || (raised > 0n && approved >= raised),

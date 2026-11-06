@@ -16,6 +16,15 @@ export async function getRelease(arcChainId: string, campaignAddress: string) {
   return row ?? null;
 }
 
+/** Fails closed unless the stored selection, the recomputed hash and Arc's commitment are identical. */
+export async function playableUpload(arcChainId: string, campaignAddress: string, onchainHash: string) {
+  const release = await getRelease(arcChainId, campaignAddress);
+  const [upload] = release ? await createDatabase().select().from(mediaUploads).where(eq(mediaUploads.id, release.mediaUploadId)).limit(1) : [];
+  if (!upload || upload.status !== "ready" || !upload.playbackId || playbackIdHash(upload.playbackId).toLowerCase() !== onchainHash
+      || release?.playbackIdHash?.toLowerCase() !== onchainHash) return null;
+  return upload;
+}
+
 /** Freezes an existing selection once Arc shows final review has locked configureRelease. */
 export async function lockRelease(arcChainId: string, campaignAddress: string) {
   await createDatabase().update(campaignMediaRelease).set({ lockedAt: new Date() })

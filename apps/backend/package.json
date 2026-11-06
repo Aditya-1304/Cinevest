@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test.mjs",
     "reconcile": "node --conditions=react-server scripts/reconcile-publications.mjs",
+    "viewing:settle": "NODE_USE_ENV_PROXY=1 node --conditions=react-server scripts/settle-viewing.mjs",
     "db:migrate": "node scripts/migrate.mjs",
     "verify:live": "NODE_USE_ENV_PROXY=1 node --conditions=react-server scripts/verify-live.mjs",
     "test:api": "node scripts/smoke-api.mjs"

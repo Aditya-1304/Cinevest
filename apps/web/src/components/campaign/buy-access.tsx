@@ -70,12 +70,20 @@ export function BuyAccess({
         args: [address ?? zeroAddress, campaign],
         chainId: ARC_TESTNET.id,
       },
+      {
+        address: campaign,
+        abi: campaignAbi,
+        functionName: "viewingAccounts",
+        args: [address ?? zeroAddress],
+        chainId: ARC_TESTNET.id,
+      },
     ],
     query: { enabled: !!address, refetchInterval: 15_000 },
   });
   const [paid, balance] = reads.data?.map((read) =>
     read.status === "success" ? (read.result as bigint) : undefined,
   ) ?? [];
+  const viewing = reads.data?.[3]?.result as readonly [bigint, bigint, bigint, bigint] | undefined;
   const readsFailed =
     reads.isError || reads.data?.some((read) => read.status === "failure");
 
@@ -84,7 +92,8 @@ export function BuyAccess({
   // While uncertain, no action resubmits until "Check status again" resolves it.
   const ready =
     !!address && !flow.busy && flow.state !== "uncertain" && !readsFailed;
-  const price = terms.watchPrice;
+  // Metered charges already settled on Arc count toward the full price.
+  const price = terms.watchPrice - (viewing?.[1] ?? 0n);
   const insufficient =
     balance !== undefined && balance < price;
   const canBuy =

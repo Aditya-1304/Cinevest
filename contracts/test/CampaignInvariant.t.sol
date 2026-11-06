@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import { Campaign } from "../src/Campaign.sol";
 import { CampaignTypes } from "../src/CampaignTypes.sol";
 import { CampaignSafetyFixture } from "./CampaignSafety.t.sol";
+import { meterCheats, METER_KEY, signReceipt } from "./CampaignMeteredViewing.t.sol";
 import { vm } from "./CampaignContribution.t.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -15,9 +16,14 @@ contract CampaignHandler is CampaignSafetyFixture {
     mapping(address => uint256) public donated;
     mapping(address => bytes32) private termsHash;
     uint256 public successfulActions;
+    /// @dev Ghost ledger for the metered viewers; they are kept apart from plain buyers on purpose.
+    mapping(address => mapping(address => uint256)) private viewerDeposited;
+    mapping(address => mapping(address => uint256)) private viewerWithdrawn;
+    mapping(address => mapping(address => uint256)) private chargedBeforeBuy;
 
     constructor() {
         setUp();
+        factory.configureMeterSigner(meterCheats.addr(METER_KEY));
         Campaign failed = _create(100e6); _fund(failed, ALICE, 40e6);
         vm.warp(failed.getTerms().fundingDeadline); failed.expire(); campaigns.push(failed);
         Campaign cancelled = _create(100e6); _fund(cancelled, ALICE, 100e6); cancelled.finalize();
@@ -33,7 +39,7 @@ contract CampaignHandler is CampaignSafetyFixture {
 
     function step(uint8 rawAction, uint256 seed) external {
         Campaign campaign = campaigns[seed % campaigns.length];
-        uint256 action = rawAction % 12;
+        uint256 action = rawAction % 17;
         address actor = seed % 2 == 0 ? ALICE : BOB;
         CampaignTypes.Stage stage = campaign.getStage();
         if (action == 0 && stage == CampaignTypes.Stage.Funding && block.timestamp < campaign.getTerms().fundingDeadline) {
@@ -84,7 +90,70 @@ contract CampaignHandler is CampaignSafetyFixture {
         } else if (action == 11) {
             uint256 amount = seed % 1000;
             token.mint(address(campaign), amount); donated[address(campaign)] += amount; successfulActions++;
+        } else if (action >= 12 && stage == CampaignTypes.Stage.Released) {
+            _meteredStep(campaign, action, seed);
         }
+    }
+
+    function _viewer(uint256 index) private pure returns (address) { return address(uint160(0x20000 + index)); }
+
+    function _meteredStep(Campaign campaign, uint256 action, uint256 seed) private {
+        address viewer = _viewer(seed % 8);
+        (uint256 balance, uint256 charged,,) = campaign.viewingAccounts(viewer);
+        uint256 price = campaign.getTerms().watchPrice;
+        if (action == 12) {
+            uint256 amount = seed % (price + 1);
+            token.mint(viewer, amount);
+            vm.prank(viewer); token.approve(address(campaign), amount);
+            vm.prank(viewer); (bool ok,) = address(campaign).call(abi.encodeCall(Campaign.depositViewing, (amount)));
+            if (ok) { viewerDeposited[address(campaign)][viewer] += amount; successfulActions++; }
+        } else if (action == 13 || action == 14) {
+            _submitReceipt(campaign, viewer, seed, action == 14);
+        } else if (action == 15) {
+            vm.prank(viewer); (bool requested,) = address(campaign).call(abi.encodeCall(Campaign.requestViewingExit, ()));
+            vm.prank(viewer); (bool withdrew,) = address(campaign).call(abi.encodeCall(Campaign.withdrawViewing, ()));
+            if (withdrew) viewerWithdrawn[address(campaign)][viewer] += balance;
+            if (requested || withdrew) successfulActions++;
+        } else if (!campaign.hasAccess(viewer)) {
+            token.mint(viewer, price - charged);
+            vm.prank(viewer); token.approve(address(campaign), price - charged);
+            chargedBeforeBuy[address(campaign)][viewer] = charged + 1;
+            vm.prank(viewer); campaign.buyAccess();
+            successfulActions++;
+        }
+    }
+
+    /// @dev Cumulative figures may be stale, ahead of the balance, or from a closing receipt.
+    function _submitReceipt(Campaign campaign, address viewer, uint256 seed, bool closing) private {
+        (uint256 balance, uint256 charged, uint64 sequence,) = campaign.viewingAccounts(viewer);
+        uint256 price = campaign.getTerms().watchPrice;
+        CampaignTypes.ViewingReceipt memory receipt = CampaignTypes.ViewingReceipt(viewer, address(campaign), campaign.livepeerPlaybackIdHash(),
+            bytes32(seed), sequence + 1, seed % (price + 1), price, closing, block.timestamp + 1);
+        bytes memory signature = signReceipt(campaign, receipt);
+        vm.prank(viewer);
+        (bool ok,) = address(campaign).call(closing
+            ? abi.encodeCall(Campaign.settleAndWithdrawViewing, (receipt, signature))
+            : abi.encodeCall(Campaign.settleViewing, (receipt, signature)));
+        if (!ok) return;
+        successfulActions++;
+        if (!closing) return;
+        (uint256 left, uint256 chargedAfter,,) = campaign.viewingAccounts(viewer);
+        require(left == 0, "closing receipt left escrow");
+        viewerWithdrawn[address(campaign)][viewer] += balance - (chargedAfter - charged);
+    }
+
+    function _assertViewing(Campaign campaign, uint256 price) private view {
+        uint256 escrow;
+        for (uint256 i; i < 8; ++i) {
+            address viewer = _viewer(i);
+            (uint256 balance, uint256 charged,,) = campaign.viewingAccounts(viewer);
+            require(charged <= price, "charged beyond price");
+            uint256 bought = chargedBeforeBuy[address(campaign)][viewer];
+            uint256 metered = bought == 0 ? charged : bought - 1;
+            require(viewerDeposited[address(campaign)][viewer] == balance + metered + viewerWithdrawn[address(campaign)][viewer], "viewer money not conserved");
+            escrow += balance;
+        }
+        require(escrow == campaign.viewingEscrow(), "escrow total mismatch");
     }
 
     function assertAccounting() external view {
@@ -97,6 +166,7 @@ contract CampaignHandler is CampaignSafetyFixture {
             require(campaign.creatorClaimed() <= campaign.creatorAllocated(), "creator overclaim");
             require(campaign.funderAllocated() <= Math.mulDiv(terms.fundingGoal, terms.repaymentCapBps, 10000), "cap exceeded");
             require(token.balanceOf(address(campaign)) == campaign.reservedUSDC() + donated[address(campaign)], "solvency/surplus mismatch");
+            _assertViewing(campaign, terms.watchPrice);
             require(campaign.paidTrancheAmount() + campaign.refundsPaid() <= campaign.raised(), "principal double spent");
             if (campaign.getStage() == CampaignTypes.Stage.Released) {
                 require(campaign.livepeerPlaybackIdHash() != bytes32(0) && campaign.releasedAt() > 0, "release without source");

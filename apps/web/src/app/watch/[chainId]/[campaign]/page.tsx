@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAddress, isAddress } from "viem";
 import { ProtectedPlayer } from "@/components/playback/protected-player";
+import { ViewingEscrow } from "@/components/campaign/viewing-escrow";
 import { AppShell } from "@/components/shell/app-shell";
 import { AddressLink } from "@/components/campaign/address-link";
 import { UnsupportedNetwork } from "@/components/campaign/unsupported-network";
@@ -9,8 +10,8 @@ import { ARC_TESTNET } from "@/lib/chain";
 import { filmPath } from "@/lib/paths";
 
 /**
- * Canonical watch route for live campaigns. Playback is gated by SIWE and Arc `hasPaidAccess`
- * through the backend; the purchase action itself is a later phase, so none renders here.
+ * Canonical watch route for live campaigns. Playback is gated by SIWE and either Arc `hasPaidAccess`
+ * or a funded metered session, so viewers can top up beside the player.
  */
 export default async function WatchPage({
   params,
@@ -50,13 +51,12 @@ export default async function WatchPage({
             Campaign contract: <AddressLink address={address} />
           </p>
           <p>
-            Sign in with the wallet that purchased access on Arc Testnet. The player
-            receives an asset-scoped token for this film.
+            Sign in with your wallet on Arc Testnet. Full access plays immediately;
+            otherwise playback draws on your refundable viewing balance.
           </p>
-          <p className="mt-4 !text-xs">
-            Purchasing access is not available on this page yet; wallets without
-            purchased access are denied.
-          </p>
+          <div className="mt-4">
+            <ViewingEscrow campaign={address} />
+          </div>
         </aside>
       </div>
     </AppShell>

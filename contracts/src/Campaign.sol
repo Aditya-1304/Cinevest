@@ -23,6 +23,17 @@ contract Campaign is ICampaignEvents, ReentrancyGuard, EIP712 {
     bytes32 public constant WORLD_AUTHORIZATION_TYPEHASH = keccak256(
         "WorldAuthorization(address wallet,address campaign,bytes32 scopedNullifierHash,bytes32 nonce,uint256 deadline)"
     );
+    /// @notice Trusted usage reporter captured at creation; zero disables metered viewing for this film.
+    /// @dev Signatures authenticate its reports, not that anyone watched. Exposure is limited to escrow a viewer deposited.
+    address public immutable meterSigner;
+    /// @notice Time the meter has to settle outstanding usage before an uncooperative exit pays out.
+    uint256 public constant VIEWING_EXIT_DELAY = 6 hours;
+    bytes32 public constant VIEWING_RECEIPT_TYPEHASH = keccak256(
+        "ViewingReceipt(address viewer,address campaign,bytes32 filmHash,bytes32 sessionId,uint64 sequence,uint256 cumulativeCharge,uint256 spendCap,bool finalForWithdrawal,uint256 deadline)"
+    );
+    mapping(address wallet => CampaignTypes.ViewingAccount account) public viewingAccounts;
+    /// @notice Refundable viewer money; excluded from revenue until a receipt finalizes it.
+    uint256 public viewingEscrow;
     mapping(bytes32 digest => bool consumed) public usedWorldAuthorizations;
     mapping(bytes32 nullifierHash => address wallet) public nullifierOwner;
     /// @notice Lifetime principal per human; refunds never reopen the funding cap.
@@ -43,6 +54,10 @@ contract Campaign is ICampaignEvents, ReentrancyGuard, EIP712 {
     error InvalidExtensionConfiguration();
     error SponsorApprovalRequired();
     error IncorrectTokenReceipt();
+    event ViewingDeposited(address indexed viewer, uint256 amount, uint256 balance);
+    event ViewingExitRequested(address indexed viewer, uint64 exitAt);
+    event ViewingSettled(address indexed viewer, bytes32 indexed sessionId, uint64 sequence, uint256 charge, uint256 cumulativeCharge);
+    event ViewingWithdrawn(address indexed viewer, uint256 amount);
 
     CampaignTypes.CampaignTerms private _terms;
     CampaignTypes.Stage private _stage;
@@ -78,13 +93,14 @@ contract Campaign is ICampaignEvents, ReentrancyGuard, EIP712 {
     uint256 public releasedAt;
     bytes32 public livepeerPlaybackIdHash;
 
-    constructor(CampaignTypes.CampaignTerms memory terms, address verifierSigner)
+    constructor(CampaignTypes.CampaignTerms memory terms, address verifierSigner, address usageSigner)
         EIP712("CinevestWorldAuthorization", "1")
     {
         CampaignTypes.validateTerms(terms);
         if (terms.worldGated && verifierSigner == address(0)) revert CampaignTypes.WorldVerifierRequired();
         _deploymentFactory = msg.sender;
         worldVerifierSigner = verifierSigner;
+        meterSigner = usageSigner;
         _terms = terms;
         _stage = CampaignTypes.Stage.Funding;
     }
@@ -401,15 +417,114 @@ contract Campaign is ICampaignEvents, ReentrancyGuard, EIP712 {
         emit StageChanged(CampaignTypes.Stage.Released);
     }
 
-    /// @notice Buys permanent wallet access and credits the immutable, cap-bounded revenue split.
+    /// @notice Buys permanent wallet access, less metered charges, and credits the cap-bounded revenue split.
+    /// @dev Marking the full price as charged turns later receipts for earlier usage into no-ops.
     function buyAccess() external nonReentrant {
         if (_stage != CampaignTypes.Stage.Released) revert CampaignTypes.ReleasedStageRequired();
         if (hasAccess[msg.sender]) revert CampaignTypes.AccessAlreadyPurchased();
-        uint256 price = _terms.watchPrice;
+        CampaignTypes.ViewingAccount storage account = viewingAccounts[msg.sender];
+        uint256 price = _terms.watchPrice - account.charged;
+        account.charged = _terms.watchPrice;
         hasAccess[msg.sender] = true;
         SafeERC20.safeTransferFrom(IERC20(_terms.usdc), msg.sender, address(this), price);
         _creditRevenue(price);
         emit WatchPurchased(msg.sender, price);
+    }
+
+    /// @notice Adds refundable viewing escrow; a wallet never holds more than the rest of the full price.
+    /// @dev New funds cancel a pending exit, so topping up cannot shorten the meter's settlement window.
+    function depositViewing(uint256 amount) external nonReentrant {
+        if (meterSigner == address(0)) revert CampaignTypes.MeteredViewingDisabled();
+        if (_stage != CampaignTypes.Stage.Released) revert CampaignTypes.ReleasedStageRequired();
+        if (hasAccess[msg.sender]) revert CampaignTypes.AccessAlreadyPurchased();
+        if (amount == 0) revert CampaignTypes.ZeroViewingDeposit();
+        CampaignTypes.ViewingAccount storage account = viewingAccounts[msg.sender];
+        if (account.charged + account.balance + amount > _terms.watchPrice) revert CampaignTypes.ViewingDepositOverPrice();
+        account.balance += amount;
+        account.exitAt = 0;
+        viewingEscrow += amount;
+        IERC20 token = IERC20(_terms.usdc);
+        uint256 beforeBalance = token.balanceOf(address(this));
+        SafeERC20.safeTransferFrom(token, msg.sender, address(this), amount);
+        if (token.balanceOf(address(this)) - beforeBalance != amount) revert IncorrectTokenReceipt();
+        emit ViewingDeposited(msg.sender, amount, account.balance);
+    }
+
+    /// @notice Finalizes cumulative usage into the waterfall; anyone may relay a meter-signed receipt.
+    /// @dev Closing receipts are excluded: relaying one here would burn its sequence and block the viewer's refund.
+    function settleViewing(CampaignTypes.ViewingReceipt calldata receipt, bytes calldata signature) external nonReentrant {
+        if (receipt.finalForWithdrawal) revert CampaignTypes.InvalidViewingReceipt();
+        _applyViewingReceipt(receipt, signature);
+    }
+
+    /// @notice Cooperative stop: settles the meter's closing receipt and refunds the rest immediately.
+    function settleAndWithdrawViewing(CampaignTypes.ViewingReceipt calldata receipt, bytes calldata signature)
+        external
+        nonReentrant
+    {
+        if (receipt.viewer != msg.sender || !receipt.finalForWithdrawal) revert CampaignTypes.InvalidViewingReceipt();
+        _applyViewingReceipt(receipt, signature);
+        if (viewingAccounts[msg.sender].balance != 0) _withdrawViewing(msg.sender);
+    }
+
+    /// @notice Starts the recovery path that needs no meter cooperation.
+    function requestViewingExit() external {
+        CampaignTypes.ViewingAccount storage account = viewingAccounts[msg.sender];
+        if (account.balance == 0) revert CampaignTypes.NothingToClaim();
+        if (account.exitAt != 0) return;
+        account.exitAt = uint64(block.timestamp + VIEWING_EXIT_DELAY);
+        emit ViewingExitRequested(msg.sender, account.exitAt);
+    }
+
+    /// @notice Refunds escrow after the exit delay, or at once when full access leaves nothing to charge.
+    function withdrawViewing() external nonReentrant {
+        CampaignTypes.ViewingAccount storage account = viewingAccounts[msg.sender];
+        if (account.balance == 0) revert CampaignTypes.NothingToClaim();
+        if (!hasAccess[msg.sender] && (account.exitAt == 0 || block.timestamp < account.exitAt)) {
+            revert CampaignTypes.ViewingExitNotReady(account.exitAt);
+        }
+        _withdrawViewing(msg.sender);
+    }
+
+    /// @notice Digest the meter signs; shared with the backend encoder for parity checks.
+    function viewingReceiptDigest(CampaignTypes.ViewingReceipt calldata receipt) public view returns (bytes32) {
+        return _hashTypedDataV4(keccak256(abi.encode(VIEWING_RECEIPT_TYPEHASH, receipt)));
+    }
+
+    /// @dev Charges are capped by the receipt, the full price and the escrow left; a shortfall stays
+    ///      unsettled in the cumulative figure, so a later deposit can still cover usage already delivered.
+    function _applyViewingReceipt(CampaignTypes.ViewingReceipt calldata receipt, bytes calldata signature) private {
+        if (block.timestamp > receipt.deadline) revert CampaignTypes.ViewingReceiptExpired();
+        if (
+            receipt.campaign != address(this) || receipt.filmHash != livepeerPlaybackIdHash
+                || receipt.cumulativeCharge > receipt.spendCap || receipt.spendCap > _terms.watchPrice
+                || meterSigner == address(0) || ECDSA.recover(viewingReceiptDigest(receipt), signature) != meterSigner
+        ) revert CampaignTypes.InvalidViewingReceipt();
+        CampaignTypes.ViewingAccount storage account = viewingAccounts[receipt.viewer];
+        if (receipt.sequence <= account.sequence) revert CampaignTypes.ViewingReceiptReplayed();
+        account.sequence = receipt.sequence;
+        uint256 charge;
+        if (receipt.cumulativeCharge > account.charged) {
+            charge = Math.min(receipt.cumulativeCharge - account.charged, account.balance);
+        }
+        if (charge != 0) {
+            account.balance -= charge;
+            account.charged += charge;
+            viewingEscrow -= charge;
+            if (account.charged == _terms.watchPrice) hasAccess[receipt.viewer] = true;
+            _creditRevenue(charge);
+        }
+        emit ViewingSettled(receipt.viewer, receipt.sessionId, receipt.sequence, charge, account.charged);
+    }
+
+    function _withdrawViewing(address viewer) private {
+        CampaignTypes.ViewingAccount storage account = viewingAccounts[viewer];
+        uint256 amount = account.balance;
+        account.balance = 0;
+        account.exitAt = 0;
+        viewingEscrow -= amount;
+        SafeERC20.safeTransfer(IERC20(_terms.usdc), viewer, amount);
+        emit ViewingWithdrawn(viewer, amount);
     }
 
     /// @notice Independent reviewer approves an exact sponsor, amount and offchain conditions commitment.
@@ -508,7 +623,7 @@ contract Campaign is ICampaignEvents, ReentrancyGuard, EIP712 {
     function reservedUSDC() public view returns (uint256) {
         return
             escrowLiability() + (funderAllocated - funderClaimed)
-                + (creatorAllocated - creatorClaimed);
+                + (creatorAllocated - creatorClaimed) + viewingEscrow;
     }
 
     /// @notice Whether future viewing receipts belong entirely to the creator.

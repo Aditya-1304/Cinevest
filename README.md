@@ -44,6 +44,10 @@ See [CRE setup and trust boundaries](docs/cre.md). Run `npm ci --prefix cre`,
 World verification endpoints are retired. Existing World-gated contracts retain
 their immutable restrictions; new campaigns use public funding.
 
+## Pay-per-view metering
+
+Viewers can deposit refundable USDC and pay only for what they watch, capped at the full price. See [docs/pay-per-view.md](docs/pay-per-view.md).
+
 ## Architecture
 
 Arc Testnet (USDC) settles funding, milestones and access purchases in the Campaign/CampaignFactory contracts. The creator's wallet lists a film on Arkiv (Rabdi); pitch, poster and evidence bytes live on Swarm with digests committed on Arc; Mux serves the paywalled film through signed playback tokens issued only after on-chain purchase; Postgres holds the journal and wallet sessions; Chainlink CRE checks Arc and Mux before final review. See [arkiv/schema.md](arkiv/schema.md).

@@ -1,0 +1,20 @@
+import { readFileSync } from 'node:fs';
+import { parse } from 'dotenv';
+// Read-only provider probe. Credentials remain server-side and upstream URLs are never logged.
+Object.assign(process.env,parse(readFileSync(new URL('../.env.local',import.meta.url))));
+await import('./register-paths.mjs');
+const auth='Basic '+Buffer.from(process.env.MUX_TOKEN_ID+':'+process.env.MUX_TOKEN_SECRET).toString('base64');
+const response=await fetch('https://api.mux.com/video/v1/assets?limit=100',{headers:{authorization:auth}});
+if(!response.ok)throw Error(`Mux asset listing: ${response.status}`);
+const assets=(await response.json()).data;
+const asset=assets.find(a=>a.status==='ready'&&a.playback_ids?.some(p=>p.policy==='signed'));
+if(!asset)throw Error('No existing ready signed asset');
+const id=asset.playback_ids.find(p=>p.policy==='signed').id;
+const {masterPlaylist,loadRendition}=await import('../lib/viewing/hls.ts');
+const master=await masterPlaylist(id);
+if(/mux\.com|token=/i.test(master))throw Error('Upstream credential leaked');
+const rendition=await loadRendition(id,0);
+if(!rendition||/mux\.com|token=/i.test(rendition.text))throw Error('Unsafe rendition');
+const segment=await fetch(rendition.segments[0].url);
+if(!segment.ok)throw Error(`Segment: ${segment.status}`);
+console.log(JSON.stringify({masterTags:master.split('\n').filter(l=>l.startsWith('#')).map(l=>l.split(':')[0]),renditionTags:[...new Set(rendition.text.split('\n').filter(l=>l.startsWith('#')).map(l=>l.split(':')[0]))],segments:rendition.segments.length,segmentBytes:(await segment.arrayBuffer()).byteLength,sealed:true}));

@@ -7,6 +7,10 @@ const rpc = 'https://rpc.testnet.arc.io';
 const artifact = JSON.parse(await readFile('contracts/out/CampaignFactory.sol/CampaignFactory.json', 'utf8'));
 const bytecode = artifact.bytecode.object;
 const creationBytecodeHash = keccak256(bytecode);
+// Public address of METER_PRIVATE_KEY; the deployer must configure it before any campaign is created.
+const meterSigner = process.env.METER_SIGNER ?? '';
+if (meterSigner && !/^0x[0-9a-fA-F]{40}$/.test(meterSigner)) throw new Error('METER_SIGNER must be an address');
+const configureMeterData = meterSigner ? '0x' + artifact.methodIdentifiers['configureMeterSigner(address)'] + meterSigner.slice(2).toLowerCase().padStart(64, '0') : '';
 
 /** Read public chain state; the browser wallet alone authorizes and submits deployment. */
 async function request(method, params = []) {
@@ -66,7 +70,8 @@ createServer(async (req, res) => {
     res.end(`<!doctype html><meta charset="utf-8"><title>Cinevest Arc deployment</title>
 <h1>Deploy CampaignFactory on Arc Testnet</h1><p>Required wallet: ${wallet}</p>
 <p>Deploys your compiled factory. Individual campaigns are subsequently created through this factory.</p>
-<button id="deploy">Connect wallet and deploy</button><pre id="status"></pre>
+<button id="deploy">Connect wallet and deploy</button>
+<button id="meter" hidden>Configure meter signer ${meterSigner}</button><pre id="status"></pre>
 <script>
 const status = document.getElementById('status');
 document.getElementById('deploy').onclick = async function () {
@@ -91,12 +96,24 @@ document.getElementById('deploy').onclick = async function () {
   await verify(hash);
  } catch(error) { status.textContent = error.message; this.disabled = false; }
 };
+function offerMeterSigner(factory) {
+ const button = document.getElementById('meter');
+ if (!'${configureMeterData}') return;
+ button.hidden = false;
+ button.onclick = async () => {
+  try {
+   const accounts = await window.ethereum.request({method:'eth_requestAccounts'});
+   const hash = await window.ethereum.request({method:'eth_sendTransaction',params:[{from:accounts[0],to:factory,data:'${configureMeterData}',value:'0x0'}]});
+   status.textContent = 'Meter signer transaction sent: ' + hash;
+  } catch(error) { status.textContent = error.message; }
+ };
+}
 // Retain the transaction hash so refreshing cannot accidentally lose a pending deployment.
 async function verify(hash) {
  status.textContent = 'Waiting for confirmation: ' + hash;
  for (let attempt = 0; attempt < 120; attempt++) {
   const response = await fetch('/receipt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hash})});
-  if (response.ok) { status.textContent = JSON.stringify(await response.json(),null,2); return; }
+  if (response.ok) { const deployment = await response.json(); status.textContent = JSON.stringify(deployment,null,2); offerMeterSigner(deployment.address); return; }
   await new Promise(resolve => setTimeout(resolve, 2000));
  }
  throw Error('Confirmation not available yet. Refresh to check the saved transaction.');
