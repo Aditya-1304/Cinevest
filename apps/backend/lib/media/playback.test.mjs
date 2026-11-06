@@ -10,11 +10,12 @@ import { fileURLToPath } from "node:url";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { SiweMessage } from "siwe";
 
-// Swap only the two external boundaries (database driver, Arc RPC); every route, guard and query is the real code.
+// Replace external database, Arc and CRE boundaries; routes, authorization and queries remain real.
 const stub = (body) => `data:text/javascript,${encodeURIComponent(body)}`;
 const stubs = {
+  "./cre": stub("export const checkCreRelease = (...args) => globalThis.__cre(...args);"),
   "@/lib/db": stub("export const createDatabase = () => globalThis.__db;"),
-  "@/lib/media/arc": stub("export const readCampaignMedia = (...args) => globalThis.__arc(...args);"),
+  "@/lib/media/arc": stub("export const readCampaignMedia = (...args) => globalThis.__arc(...args); export const canInspectRelease = async (wallet, creator, reviewer) => wallet === creator || wallet === reviewer;"),
 };
 registerHooks({ resolve(specifier, context, next) {
   if (stubs[specifier]) return { url: stubs[specifier], shortCircuit: true };
@@ -201,6 +202,18 @@ test("duplicate provider callbacks converge on a single ready state", async () =
   provider([["/video/v1/assets/", () => muxAsset("errored")]]); // a late conflicting callback cannot undo ready
   assert.equal((await reconcileUpload({ ...row, status: "uploading" })).row.status, "ready");
 });
+
+// Model the CRE provider verdict while retaining the real final-review gate and hash checks.
+globalThis.__cre = async (_campaign, assetId, commitment) => {
+  const response = await fetch(`https://api.mux.com/video/v1/assets/${assetId}`);
+  const asset = response.ok ? (await response.json()).data : undefined;
+  const checks = {
+    providerReady: asset?.status === "ready",
+    signedOnly: Boolean(asset?.playback_ids?.length && asset.playback_ids.every(id => id.policy === "signed")),
+    commitmentMatches: Boolean(asset?.playback_ids?.some(id => playbackIdHash(id.id).toLowerCase() === commitment)),
+  };
+  return { ready: Object.values(checks).every(Boolean), checks, expiresAt: Math.floor(Date.now() / 1000) + 180 };
+};
 
 test("provider asset deletion or policy reset is caught by the final-review gate", async () => {
   await seedRelease();

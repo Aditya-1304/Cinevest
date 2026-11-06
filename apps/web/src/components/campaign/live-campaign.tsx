@@ -14,6 +14,7 @@ import { CampaignActions } from "./campaign-actions";
 import { MilestonePanel } from "./milestone-panel";
 import { ReleasePanel } from "./release-panel";
 import { BuyAccess } from "./buy-access";
+import { ViewingEscrow } from "./viewing-escrow";
 import { stagePillClass } from "@/lib/stage-style";
 
 export function LiveCampaign({ campaign }: { campaign: Address }) {
@@ -212,6 +213,7 @@ export function LiveCampaign({ campaign }: { campaign: Address }) {
                 terms={terms.data}
                 stage={stage.data}
               />
+              <ViewingEscrow campaign={campaign} />
             </div>
           )}
       </div>

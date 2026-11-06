@@ -71,6 +71,15 @@ library CampaignTypes {
     error DisputeNotPending(uint256 index);
     error DisputePending(uint256 index);
     error EvidenceRejected(uint256 index);
+    error MeteredViewingDisabled();
+    error MeterSignerRequired();
+    error MeterSignerAlreadyConfigured();
+    error ZeroViewingDeposit();
+    error ViewingDepositOverPrice();
+    error InvalidViewingReceipt();
+    error ViewingReceiptExpired();
+    error ViewingReceiptReplayed();
+    error ViewingExitNotReady(uint64 exitAt);
 
     /// @notice Reverts unless the deployment chain is the configured Arc Testnet.
     function ensureArcTestnet() internal view {
@@ -120,6 +129,29 @@ library CampaignTypes {
         address campaign;
         bytes32 scopedNullifierHash;
         bytes32 nonce;
+        uint256 deadline;
+    }
+
+    /// @notice Refundable metered-viewing position of one wallet.
+    /// @dev Lifetime deposits = balance + metered part of charged + withdrawals; only charges reach the waterfall.
+    struct ViewingAccount {
+        uint256 balance;
+        uint256 charged;
+        uint64 sequence;
+        uint64 exitAt;
+    }
+
+    /// @notice Meter statement of a wallet's cumulative usage; replaying or reordering cannot charge twice.
+    /// @dev Field order is the EIP-712 schema shared with `packages/abi/src/viewing-receipt.ts`.
+    struct ViewingReceipt {
+        address viewer;
+        address campaign;
+        bytes32 filmHash;
+        bytes32 sessionId;
+        uint64 sequence;
+        uint256 cumulativeCharge;
+        uint256 spendCap;
+        bool finalForWithdrawal;
         uint256 deadline;
     }
 

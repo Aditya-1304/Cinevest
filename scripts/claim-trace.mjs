@@ -63,9 +63,9 @@ for (const event of logs) {
   }
   if (event.eventName === "RevenueCredited") {
     const receipt = logs.find((other) => other.transactionHash === event.transactionHash
-      && ["WatchPurchased", "SponsorDeposited"].includes(other.eventName));
+      && ["WatchPurchased", "SponsorDeposited", "ViewingSettled"].includes(other.eventName));
     if (!receipt) throw new Error("Revenue source missing");
-    const amount = receipt.eventName === "WatchPurchased" ? receipt.args.price : receipt.args.amount;
+    const amount = receipt.args.price ?? receipt.args.charge ?? receipt.args.amount;
     if (!timestamps.has(event.blockNumber)) timestamps.set(event.blockNumber, (await client.getBlock({ blockNumber: event.blockNumber })).timestamp);
     const cap = raised * BigInt(terms.repaymentCapBps) / 10000n;
     const share = amount * BigInt(terms.funderBps) / 10000n;

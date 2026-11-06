@@ -42,7 +42,7 @@ async function simulate(request) {
       delete env.CRE_RUNNER_SECRET;
       const child = spawn(process.env.CRE_BIN ?? "cre", [
         "workflow", "simulate", "release-readiness", "--target", "local-simulation",
-        "--non-interactive", "--trigger-index", "0", "--http-payload", "@" + payload,
+        "--non-interactive", "--trigger-index", "0", "--http-payload", payload,
       ], { cwd: root, env, stdio: ["ignore", "pipe", "pipe"], detached: process.platform !== "win32" });
       activeChild = child;
       let output = "", length = 0, failure;

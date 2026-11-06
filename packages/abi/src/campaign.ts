@@ -79,6 +79,11 @@ export const campaignAbi = [
         "name": "verifierSigner",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "usageSigner",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
@@ -105,6 +110,32 @@ export const campaignAbi = [
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "VIEWING_EXIT_DELAY",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "VIEWING_RECEIPT_TYPEHASH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -438,6 +469,19 @@ export const campaignAbi = [
         "name": "conditionsHash",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "depositViewing",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -830,6 +874,19 @@ export const campaignAbi = [
   },
   {
     "type": "function",
+    "name": "meterSigner",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "nullifierOwner",
     "inputs": [
       {
@@ -921,6 +978,13 @@ export const campaignAbi = [
   },
   {
     "type": "function",
+    "name": "requestViewingExit",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "reservedUSDC",
     "inputs": [],
     "outputs": [
@@ -967,6 +1031,136 @@ export const campaignAbi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "settleAndWithdrawViewing",
+    "inputs": [
+      {
+        "name": "receipt",
+        "type": "tuple",
+        "internalType": "struct CampaignTypes.ViewingReceipt",
+        "components": [
+          {
+            "name": "viewer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "campaign",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "filmHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "sessionId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "sequence",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "cumulativeCharge",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "spendCap",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "finalForWithdrawal",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "signature",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "settleViewing",
+    "inputs": [
+      {
+        "name": "receipt",
+        "type": "tuple",
+        "internalType": "struct CampaignTypes.ViewingReceipt",
+        "components": [
+          {
+            "name": "viewer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "campaign",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "filmHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "sessionId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "sequence",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "cumulativeCharge",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "spendCap",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "finalForWithdrawal",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "signature",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1081,6 +1275,126 @@ export const campaignAbi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "viewingAccounts",
+    "inputs": [
+      {
+        "name": "wallet",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "balance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "charged",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "sequence",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "exitAt",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "viewingEscrow",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "viewingReceiptDigest",
+    "inputs": [
+      {
+        "name": "receipt",
+        "type": "tuple",
+        "internalType": "struct CampaignTypes.ViewingReceipt",
+        "components": [
+          {
+            "name": "viewer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "campaign",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "filmHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "sessionId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "sequence",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "cumulativeCharge",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "spendCap",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "finalForWithdrawal",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "withdrawViewing",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1497,6 +1811,106 @@ export const campaignAbi = [
   },
   {
     "type": "event",
+    "name": "ViewingDeposited",
+    "inputs": [
+      {
+        "name": "viewer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "balance",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ViewingExitRequested",
+    "inputs": [
+      {
+        "name": "viewer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "exitAt",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ViewingSettled",
+    "inputs": [
+      {
+        "name": "viewer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "sessionId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "sequence",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      },
+      {
+        "name": "charge",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "cumulativeCharge",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ViewingWithdrawn",
+    "inputs": [
+      {
+        "name": "viewer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "WatchPurchased",
     "inputs": [
       {
@@ -1575,6 +1989,33 @@ export const campaignAbi = [
         "name": "index",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ECDSAInvalidSignature",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ECDSAInvalidSignatureLength",
+    "inputs": [
+      {
+        "name": "length",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ECDSAInvalidSignatureS",
+    "inputs": [
+      {
+        "name": "s",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ]
   },
@@ -1721,7 +2162,17 @@ export const campaignAbi = [
   },
   {
     "type": "error",
+    "name": "InvalidViewingReceipt",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidWorldAuthorization",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MeteredViewingDisabled",
     "inputs": []
   },
   {
@@ -1892,6 +2343,32 @@ export const campaignAbi = [
   },
   {
     "type": "error",
+    "name": "ViewingDepositOverPrice",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ViewingExitNotReady",
+    "inputs": [
+      {
+        "name": "exitAt",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ViewingReceiptExpired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ViewingReceiptReplayed",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "WatchPriceRequired",
     "inputs": []
   },
@@ -1928,6 +2405,11 @@ export const campaignAbi = [
   {
     "type": "error",
     "name": "ZeroContribution",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroViewingDeposit",
     "inputs": []
   }
 ] as const;

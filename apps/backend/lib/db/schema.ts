@@ -4,7 +4,9 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -160,4 +162,43 @@ export const worldAuthorizations = pgTable("world_authorizations", {
 }, (table) => [
   uniqueIndex("world_authorizations_digest_unique").on(table.digest),
   uniqueIndex("world_authorizations_nonce_unique").on(table.nonce),
+]);
+
+const usdc = (name: string) => numeric(name, { precision: 78, scale: 0 }).notNull().default("0");
+const blockRanges = (name: string) => jsonb(name).$type<[number, number][]>().notNull().default([]);
+
+/**
+ * Durable metering ledger: one row per wallet and film, written only by compare-and-set on `revision`.
+ * Arc owns the money; `onchain*` is a read snapshot, and `chargedUnits` is usage not yet proven on Arc.
+ */
+export const viewingAccounts = pgTable("viewing_accounts", {
+  arcChainId: text("arc_chain_id").notNull(),
+  campaignAddress: text("campaign_address").notNull(),
+  wallet: text("wallet").notNull(),
+  playbackId: text("playback_id").notNull(),
+  filmHash: text("film_hash").notNull(),
+  price: numeric("price", { precision: 78, scale: 0 }).notNull(),
+  totalBlocks: integer("total_blocks").notNull(),
+  watched: blockRanges("watched"),
+  reserved: blockRanges("reserved"),
+  unreported: blockRanges("unreported"),
+  chargedUnits: usdc("charged_units"),
+  onchainBalance: usdc("onchain_balance"),
+  onchainCharged: usdc("onchain_charged"),
+  onchainSequence: integer("onchain_sequence").notNull().default(0),
+  exitAt: timestamp("exit_at", { withTimezone: true }),
+  chainReadAt: timestamp("chain_read_at", { withTimezone: true }).defaultNow().notNull(),
+  sequence: integer("sequence").notNull().default(0),
+  finalSequence: integer("final_sequence"),
+  finalUntil: timestamp("final_until", { withTimezone: true }),
+  sessionId: uuid("session_id"),
+  leaseUntil: timestamp("lease_until", { withTimezone: true }),
+  positionSeconds: integer("position_seconds").notNull().default(0),
+  revision: integer("revision").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.arcChainId, table.campaignAddress, table.wallet] }),
+  index("viewing_accounts_lease_idx").on(table.leaseUntil),
+  index("viewing_accounts_unsettled_idx").on(table.chargedUnits, table.onchainCharged),
 ]);

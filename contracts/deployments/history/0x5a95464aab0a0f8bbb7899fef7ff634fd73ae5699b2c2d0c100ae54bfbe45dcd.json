@@ -1,0 +1,10 @@
+{
+  "chainId": 5042002,
+  "contract": "CampaignFactory",
+  "address": "0x503ccf5a1d873d91e8581042aea002e02f027cd8",
+  "deployer": "0xb58cd8a0b36f50919d80cd0ff465ff7a370ae807",
+  "transactionHash": "0x5a95464aab0a0f8bbb7899fef7ff634fd73ae5699b2c2d0c100ae54bfbe45dcd",
+  "blockNumber": 71024966,
+  "creationBytecodeHash": "0x38cfa91b2e4e4551b4c21e3bcc46ad604e560f2b6c0859d73519552e1e8195f1",
+  "runtimeCodeHash": "0x4f626dc700dde224745dd97c4d3181d8a36c2afd7bb9d71667a6ef23714e908d"
+}

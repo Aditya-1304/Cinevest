@@ -52,6 +52,19 @@ export const campaignFactoryAbi = [
   },
   {
     "type": "function",
+    "name": "configureMeterSigner",
+    "inputs": [
+      {
+        "name": "signer",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "configureWorldVerifierSigner",
     "inputs": [
       {
@@ -261,6 +274,19 @@ export const campaignFactoryAbi = [
   },
   {
     "type": "function",
+    "name": "meterSigner",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "worldVerifierAdmin",
     "inputs": [],
     "outputs": [
@@ -306,6 +332,19 @@ export const campaignFactoryAbi = [
   },
   {
     "type": "event",
+    "name": "MeterSignerConfigured",
+    "inputs": [
+      {
+        "name": "signer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "WorldVerifierConfigured",
     "inputs": [
       {
@@ -336,6 +375,16 @@ export const campaignFactoryAbi = [
   {
     "type": "error",
     "name": "CreatorRequired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MeterSignerAlreadyConfigured",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MeterSignerRequired",
     "inputs": []
   },
   {

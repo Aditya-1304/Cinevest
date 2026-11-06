@@ -13,6 +13,13 @@ interface ICampaign {
     /// @notice Returns the current funding and production lifecycle stage.
     /// @notice Purchases released-film access once per wallet and credits viewing revenue.
     function buyAccess() external;
+    function depositViewing(uint256 amount) external;
+    function settleViewing(CampaignTypes.ViewingReceipt calldata receipt, bytes calldata signature) external;
+    function settleAndWithdrawViewing(CampaignTypes.ViewingReceipt calldata receipt, bytes calldata signature) external;
+    function requestViewingExit() external;
+    function withdrawViewing() external;
+    function viewingEscrow() external view returns (uint256);
+    function meterSigner() external view returns (address);
     function hasAccess(address wallet) external view returns (bool);
     function hasPaidAccess(address wallet) external view returns (bool);
     function funderAllocated() external view returns (uint256);

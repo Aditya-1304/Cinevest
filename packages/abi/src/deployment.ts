@@ -2,11 +2,11 @@
 export const arcTestnetDeployment = {
   "chainId": 5042002,
   "contract": "CampaignFactory",
-  "address": "0x503ccf5a1d873d91e8581042aea002e02f027cd8",
-  "deployer": "0xb58cd8a0b36f50919d80cd0ff465ff7a370ae807",
-  "transactionHash": "0x5a95464aab0a0f8bbb7899fef7ff634fd73ae5699b2c2d0c100ae54bfbe45dcd",
-  "blockNumber": 71024966,
-  "creationBytecodeHash": "0x38cfa91b2e4e4551b4c21e3bcc46ad604e560f2b6c0859d73519552e1e8195f1",
-  "runtimeCodeHash": "0x4f626dc700dde224745dd97c4d3181d8a36c2afd7bb9d71667a6ef23714e908d",
+  "address": "0x78f21797d0c8be56c41e10009e95d77f399581b0",
+  "deployer": "0xb4c01a6be9278db57803bfb57c7a9a70117afbff",
+  "transactionHash": "0x7c6c3c9dfe324c650e2fe68b623ec751a5f5707067ae755dd94252b11770a711",
+  "blockNumber": 71063643,
+  "creationBytecodeHash": "0xbb76af80d6ce34b5688fd6950d11c409bec29993549239728308a0cc733c957a",
+  "runtimeCodeHash": "0x264f38c80d68d454bc6c5158765e35c64b5d913d6a5f168e9d2e954af8e5487a",
   "compatible": true
 } as const;

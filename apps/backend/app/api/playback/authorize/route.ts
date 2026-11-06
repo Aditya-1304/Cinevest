@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { authenticate } from "@/lib/auth/session";
-import { createDatabase } from "@/lib/db";
-import { mediaUploads } from "@/lib/db/schema";
 import { readJson } from "@/lib/http";
 import { readCampaignMedia } from "@/lib/media/arc";
 import { arcChainId, campaignAddress } from "@/lib/media/input";
 import { playbackTtlSeconds, signPlaybackToken } from "@/lib/media/playback-token";
-import { getRelease, playbackIdHash } from "@/lib/media/release";
+import { playableUpload } from "@/lib/media/release";
 
 const schema = z.object({ arcChainId, campaignAddress }).strict();
 const headers = { "cache-control": "no-store" };
@@ -30,13 +27,8 @@ export async function POST(request: Request) {
     const campaign = await readCampaignMedia(input.campaignAddress, session.address as `0x${string}`);
     if (!campaign || !campaign.released) return NextResponse.json({ error: "Film is not available" }, { status: 404 });
     if (!campaign.paid) return NextResponse.json({ error: "Purchase required" }, { status: 403, headers });
-    const release = await getRelease(input.arcChainId, input.campaignAddress);
-    const [upload] = release ? await createDatabase().select().from(mediaUploads).where(eq(mediaUploads.id, release.mediaUploadId)).limit(1) : [];
-    // Fail closed unless the stored selection, the recomputed hash and Arc's commitment are identical.
-    if (!upload || upload.status !== "ready" || !upload.playbackId || playbackIdHash(upload.playbackId).toLowerCase() !== campaign.onchainHash
-        || release?.playbackIdHash?.toLowerCase() !== campaign.onchainHash) {
-      return NextResponse.json({ error: "Playback source is unavailable" }, { status: 409, headers });
-    }
+    const upload = await playableUpload(input.arcChainId, input.campaignAddress, campaign.onchainHash);
+    if (!upload?.playbackId) return NextResponse.json({ error: "Playback source is unavailable" }, { status: 409, headers });
     return NextResponse.json({ playbackId: upload.playbackId, ...(await signPlaybackToken(upload.playbackId, playbackTtlSeconds(upload.durationSeconds))) }, { headers });
   } catch { return NextResponse.json({ error: "Playback authorization unavailable", retryable: true }, { status: 503, headers }); }
 }
