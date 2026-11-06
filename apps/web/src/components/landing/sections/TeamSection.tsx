@@ -28,7 +28,7 @@ const TeamSection = () => {
                         />
                     </h2>
                     <p className='font-light text-lg text-[#FFFFFF]/70 mt-5'>
-                        The filmmakers behind this season's demo campaigns.
+                        The filmmakers behind this season&apos;s demo campaigns.
                         <br />
                         All profiles are fictional.
                     </p>

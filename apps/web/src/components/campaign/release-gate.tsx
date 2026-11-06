@@ -134,6 +134,7 @@ export function useReleaseGate(campaign: Address, enabled: boolean) {
     if (!enabled) {
       statusRef.current = "idle";
       passedAtRef.current = 0;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets gate state when the gate turns off
       setState({ status: "idle", checks: {} });
       return;
     }

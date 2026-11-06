@@ -21,7 +21,8 @@ Web: http://localhost:3000. Backend: http://localhost:3001. The web app proxies 
 - `apps/backend`: Next.js route handlers; Arkiv SDK, SIWE, JOSE and Postgres dependencies. Livepeer and Bee integrations can use server-side fetch.
 - `contracts`: Foundry configuration. Create the Arc Studio starting project before importing contracts here, as required by the spec. Install Foundry separately, then use `npm run contracts:build` and `npm run contracts:test`.
 - `packages/abi`: reserved for generated contract ABIs; no fabricated contract interface.
-- `arkiv`: reserved for schema and integration evidence.
+- `arkiv`: Arkiv schema and sponsor criterion files (`schema.md`, `reach.md`, `why-arkiv.md`, `how-you-use-arkiv.md`, `friction.md`, `swarm.md`).
+- `docs`: operations [runbook](docs/runbook.md), Swarm node guide, Phase 8 and World docs.
 
 `npm run typecheck`, `npm run lint`, and `npm run build` validate the TypeScript applications.
 
@@ -35,3 +36,29 @@ Phase 9 code now includes server-side proof verification, durable EIP-712 fundin
 permissions and the gated contribution UI. See [implementation and activation](docs/world/phase-9-completion.md)
 and the [World integration debrief](docs/world/debrief.md). Live World proof and
 matching-deployment acceptance remain outstanding; incompatible funding is disabled.
+
+## Architecture
+
+Arc Testnet (USDC) settles funding, milestones and access purchases in the Campaign/CampaignFactory contracts. The creator's wallet lists a film on Arkiv (Rabdi); pitch, poster and evidence bytes live on Swarm with digests committed on Arc; Mux serves the paywalled film through signed playback tokens issued only after on-chain purchase; Postgres holds the journal, sessions and World challenges. See [arkiv/schema.md](arkiv/schema.md).
+
+## Sponsor integrations
+
+- **Arc:** factory `0x503ccf5a1d873d91e8581042aea002e02f027cd8` (manifest: `contracts/deployments/arc-testnet.json`).
+- **Arkiv + Swarm:** see the `arkiv/` files.
+- **World ID:** gated funding, verified first round, one-human-one-wallet cap; see `docs/world/`.
+
+## Environment
+
+Copy the `.env.example` files, then fill `apps/backend/.env.local` (database, Arc RPC, Swarm, session secret, Mux, Arkiv key, World ID) and `apps/web/.env.local` (`NEXT_PUBLIC_WORLD_APP_ID`, `NEXT_PUBLIC_WORLD_ACTION`). Never commit them.
+
+## Demo flows
+
+`/demo` has a guided walkthrough and the Circle faucet link. Roles: a creator wallet, a backer wallet and a reviewer wallet (use your own test wallets; no keys are published).
+
+## AI disclosure
+
+This project was built with AI coding assistance (Claude, plus other models under human review). All code was reviewed and verified by the team against live testnets.
+
+## Creator form
+
+`/create` has two steps: the film proposal (title, genre, pitch up to 2,000 characters, independent reviewer, poster, rights notice) and the finance terms, including optional World ID gating (per-human cap and an optional verified first round). Form controls use shadcn-style `Input`, `Textarea` and `Label` from `apps/web/src/components/ui`, which also style the native poster file picker. The form grows with its content, resets to an empty form after a film is published or set aside ("Create another film" / "Start a new film instead"), and long pitches are clamped with "Read more" on film pages. Non-landing pages use a faint grid backdrop; the landing page keeps its own.

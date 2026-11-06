@@ -47,6 +47,8 @@ export type PublicationRecord = {
   digest?: string;
   swarmReference?: string;
   arcTxHash?: Hash;
+  /** Unique humans that must fund before a World-gated campaign opens to everyone. */
+  verifiedRound?: number;
   registered?: boolean;
   campaign?: `0x${string}`;
   confirmed?: boolean;
@@ -62,6 +64,7 @@ export type PublicationDraft = {
   rightsNotice: string;
   poster: { contentType: string; base64: string };
   terms: Parameters<typeof toWireTerms>[0];
+  verifiedRound?: number;
 };
 
 class FlowError extends Error {}
@@ -238,14 +241,26 @@ export function usePublication() {
           if (chainId !== ARC_TESTNET.id) await switchChainAsync({ chainId: ARC_TESTNET.id });
           mark(current, "Confirm the campaign deployment in your wallet…");
           const terms = fromWireTerms(rec.terms!);
-          const simulation = await client.simulateContract({
-            address: factory,
-            abi: campaignFactoryAbi,
-            functionName: "createCampaign",
-            args: [terms],
-            account: actor,
-          });
-          const hash = await writer.writeContractAsync({ ...simulation.request, chainId: ARC_TESTNET.id });
+          let hash: Hash;
+          if (rec.verifiedRound) {
+            const simulation = await client.simulateContract({
+              address: factory,
+              abi: campaignFactoryAbi,
+              functionName: "createCampaignWithVerifiedRound",
+              args: [terms, BigInt(rec.verifiedRound)],
+              account: actor,
+            });
+            hash = await writer.writeContractAsync({ ...simulation.request, chainId: ARC_TESTNET.id });
+          } else {
+            const simulation = await client.simulateContract({
+              address: factory,
+              abi: campaignFactoryAbi,
+              functionName: "createCampaign",
+              args: [terms],
+              account: actor,
+            });
+            hash = await writer.writeContractAsync({ ...simulation.request, chainId: ARC_TESTNET.id });
+          }
           submitted = true;
           patch({ arcTxHash: hash });
         }
@@ -434,6 +449,7 @@ export function usePublication() {
         genre: draft.genre,
         synopsis: draft.synopsis,
         rightsNotice: draft.rightsNotice,
+        verifiedRound: draft.verifiedRound,
       };
       saveRecord(fresh);
       setRecord(fresh);

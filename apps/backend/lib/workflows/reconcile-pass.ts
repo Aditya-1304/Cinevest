@@ -1,4 +1,5 @@
 /** One bounded recovery pass; all writes use the existing revision-checked journal transitions. */
+import { logEvent } from "../log";
 import { isAddress } from "viem";
 
 export async function reconcilePublications(limit = 20) {
@@ -28,9 +29,9 @@ export async function reconcilePublications(limit = 20) {
           operation = await workflow.completeArkivPublication(store, operation.actor, operation.requestDigest, entity);
         }
       }
-      console.log(JSON.stringify({ id: operation.id, status: operation.status }));
+      logEvent("info", "publication.reconciled", { op: operation.id, campaign: operation.campaignAddress ?? undefined, status: operation.status });
     } catch (error) {
-      console.error(JSON.stringify({ id: row.id, error: error instanceof Error ? error.message : String(error) }));
+      logEvent("error", "publication.reconcile_failed", { op: row.id, campaign: row.campaignAddress ?? undefined, error: error instanceof Error ? error.message : String(error) });
       failed += 1;
     }
   }

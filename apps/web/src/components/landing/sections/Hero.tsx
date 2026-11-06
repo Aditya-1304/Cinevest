@@ -54,7 +54,7 @@ const Hero = () => {
                                 <span>The Last Monsoon</span>
                             </h2>
                             <p className="font-medium text-lg">
-                                A fisherman's daughter chases a storm
+                                A fisherman&apos;s daughter chases a storm
                                 <br />
                                 that could save or sink her village.
                             </p>

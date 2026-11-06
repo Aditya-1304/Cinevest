@@ -1,3 +1,4 @@
+import { logEvent } from "../log";
 import "server-only";
 import { eq } from "drizzle-orm";
 import { createDatabase } from "@/lib/db";
@@ -15,7 +16,7 @@ export async function verifyRelease(arcChainId: string, campaignAddress: string,
   const checks: Record<string, boolean> = {};
   const finish = (reason?: string) => {
     const ok = !reason;
-    if (!ok) console.warn(JSON.stringify({ event: "media.release.verify_failed", arcChainId, campaignAddress, reason }));
+    if (!ok) logEvent("warn", "media.release.verify_failed", { campaign: campaignAddress, provider: "mux", arcChainId, reason });
     return { ok, reason, evidence: "trusted-offchain" as const, checkedAt: new Date().toISOString(), checks };
   };
   const release = await getRelease(arcChainId, campaignAddress);

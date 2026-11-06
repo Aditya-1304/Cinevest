@@ -20,8 +20,10 @@ const fromBlock = BigInt(process.env.FROM_BLOCK ?? "0");
 if (fromBlock < 0n || fromBlock > blockNumber) throw new Error("Invalid FROM_BLOCK");
 if (fromBlock > 0n && await client.getCode({ address: campaign, blockNumber: fromBlock - 1n }))
   throw new Error("FROM_BLOCK must be at or before campaign deployment");
-for (let start = fromBlock; start <= blockNumber; start += 2000n) {
-  const end = start + 1999n < blockNumber ? start + 1999n : blockNumber;
+// Public RPCs cap eth_getLogs ranges; override with CHUNK (blocks) if the default is rejected.
+const span = BigInt(process.env.CHUNK ?? "2000");
+for (let start = fromBlock; start <= blockNumber; start += span) {
+  const end = start + span - 1n < blockNumber ? start + span - 1n : blockNumber;
   const [events, incoming, outgoing] = await Promise.all([
     client.getContractEvents({ address: campaign, abi, fromBlock: start, toBlock: end, strict: true }),
     client.getLogs({ address: terms.usdc, event: transfer, args: { to: campaign }, fromBlock: start, toBlock: end, strict: true }),

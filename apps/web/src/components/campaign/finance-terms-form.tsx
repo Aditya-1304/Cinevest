@@ -1,5 +1,7 @@
 "use client";
 
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useAccount, useSwitchChain } from "wagmi";
@@ -109,13 +111,18 @@ function validate(values: Values): Partial<Record<FieldName, string>> {
 export function FinanceTermsForm({
   reviewer,
   proposal,
+  onNewFilm,
 }: {
   reviewer: string;
   proposal: ProposalDraft;
+  /** Called after the user sets aside or finishes a film so the parent can clear the proposal. */
+  onNewFilm?: () => void;
 }) {
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [valid, setValid] = useState(false);
+  const [world, setWorld] = useState({ gated: false, limit: "", round: "" });
+  const [worldErrors, setWorldErrors] = useState<{ limit?: string; round?: string }>({});
   const [starting, setStarting] = useState(false);
   const publication = usePublication();
   const { address, chainId } = useAccount();
@@ -130,9 +137,28 @@ export function FinanceTermsForm({
     reviewer.toLowerCase() !== address?.toLowerCase();
   const issue = proposalIssue(proposal);
 
+  /** World gating needs a per-human cap; an optional verified first round counts unique humans. */
+  function validateWorld() {
+    const next: { limit?: string; round?: string } = {};
+    if (world.gated) {
+      if (!validAmount(world.limit))
+        next.limit = "Enter a positive cap with at most 6 decimal places.";
+      else if (
+        validAmount(values.fundingGoal) &&
+        parseUnits(world.limit, 6) > parseUnits(values.fundingGoal, 6)
+      )
+        next.limit = "The cap cannot exceed the funding goal.";
+      if (world.round && !integerInRange(world.round, 1n, 1_000_000n))
+        next.round = "Enter a whole number of humans from 1 to 1,000,000.";
+    }
+    setWorldErrors(next);
+    return next;
+  }
+
   async function deploy() {
     const nextErrors = validate(values);
     setErrors(nextErrors);
+    if (Object.keys(validateWorld()).length) return;
     if (
       !address ||
       !reviewerValid ||
@@ -168,9 +194,10 @@ export function FinanceTermsForm({
           rightsDuration: BigInt(values.rightsDuration) * 86400n,
           // Replaced by the Swarm root of the pitch before anything is signed.
           pitchReference: zeroHash,
-          worldGated: false,
-          perHumanLimit: 0n,
+          worldGated: world.gated,
+          perHumanLimit: world.gated ? parseUnits(world.limit, 6) : 0n,
         },
+        verifiedRound: world.gated && world.round ? Number(world.round) : undefined,
       });
     } finally {
       setStarting(false);
@@ -181,7 +208,10 @@ export function FinanceTermsForm({
     event.preventDefault();
     const nextErrors = validate(values);
     setErrors(nextErrors);
-    setValid(Object.keys(nextErrors).length === 0);
+    setValid(
+      Object.keys(nextErrors).length === 0 &&
+        Object.keys(validateWorld()).length === 0,
+    );
   }
 
   return (
@@ -196,12 +226,9 @@ export function FinanceTermsForm({
       </p>
       <div className="grid grid-cols-1 gap-x-3 min-[561px]:grid-cols-2 min-[1000px]:grid-cols-3">
         {fields.map((field) => (
-          <div
-            className="my-1 grid min-w-0 content-start gap-1 [&_input]:h-9 [&_input]:w-full [&_input]:min-w-0 [&_input]:rounded-md [&_input]:border [&_input]:border-white/15 [&_input]:bg-[#072733] [&_input]:px-2.5 [&_input]:py-1.5 [&_input]:text-sm [&_input]:text-white [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-[#d3ed05] [&_input[aria-invalid=true]]:border-[#ef8888] [&_label]:text-xs [&_label]:font-bold [&_small]:text-[10px] [&_small]:leading-tight [&_small]:text-white/60"
-            key={field.name}
-          >
-            <label htmlFor={field.name}>{field.label}</label>
-            <input
+          <div className="my-1 grid min-w-0 content-start gap-1.5 [&_small]:text-[10px] [&_small]:text-white/50" key={field.name}>
+            <Label htmlFor={field.name}>{field.label}</Label>
+            <Input
               id={field.name}
               type={"type" in field ? field.type : "text"}
               inputMode={"type" in field ? undefined : "decimal"}
@@ -227,6 +254,70 @@ export function FinanceTermsForm({
           </div>
         ))}
       </div>
+      <fieldset
+        className="mt-3 space-y-2 rounded-xl border border-white/10 p-3 [&_label]:text-xs [&_small]:text-[10px] [&_small]:text-white/50"
+        disabled={hasProgress || published}
+      >
+        <legend className="px-1 text-xs font-bold text-white">Fair funding with World ID</legend>
+        <label className="flex items-center gap-2 font-bold">
+          <Input
+            type="checkbox"
+            checked={world.gated}
+            onChange={(event) => {
+              setWorld({ ...world, gated: event.target.checked });
+              setValid(false);
+            }}
+          />
+          Require World ID verification to fund this film
+        </label>
+        <p>
+          Each verified human can fund from one wallet only, up to a cap you set. Funders verify
+          once on the campaign page before contributing.
+        </p>
+        {world.gated && (
+          <div className="grid gap-2 min-[561px]:grid-cols-2">
+            <div className="grid gap-1">
+              <label htmlFor="worldLimit" className="font-bold">
+                Cap per human (test USDC)
+              </label>
+              <Input
+                id="worldLimit"
+                type="text"
+                inputMode="decimal"
+                value={world.limit}
+                aria-invalid={!!worldErrors.limit}
+                onChange={(event) => {
+                  setWorld({ ...world, limit: event.target.value });
+                  setValid(false);
+                }}
+              />
+              {worldErrors.limit && (
+                <small role="alert" className="!text-[#ffaaaa]">{worldErrors.limit}</small>
+              )}
+            </div>
+            <div className="grid gap-1">
+              <label htmlFor="worldRound" className="font-bold">
+                Verified first round: humans (optional)
+              </label>
+              <Input
+                id="worldRound"
+                type="text"
+                inputMode="numeric"
+                value={world.round}
+                aria-invalid={!!worldErrors.round}
+                onChange={(event) => {
+                  setWorld({ ...world, round: event.target.value });
+                  setValid(false);
+                }}
+              />
+              <small>After this many unique verified humans fund, funding opens to everyone.</small>
+              {worldErrors.round && (
+                <small role="alert" className="!text-[#ffaaaa]">{worldErrors.round}</small>
+              )}
+            </div>
+          </div>
+        )}
+      </fieldset>
       <button
         className="hover:border-[#e4ff1a] hover:bg-[#e4ff1a] mt-2 inline-flex h-9 items-center justify-center rounded-lg border border-[#d3ed05] bg-[#d3ed05] px-4 text-xs font-bold text-black transition"
         type="submit"
@@ -294,7 +385,10 @@ export function FinanceTermsForm({
               className="h-9 min-h-9 text-xs"
               disabled={publication.running}
               type="button"
-              onClick={publication.startNew}
+              onClick={() => {
+                publication.startNew();
+                onNewFilm?.();
+              }}
             >
               Start a new film instead
             </Button>
@@ -326,7 +420,10 @@ export function FinanceTermsForm({
           <Button
             className="h-9 min-h-9 text-xs"
             type="button"
-            onClick={publication.startNew}
+            onClick={() => {
+                publication.startNew();
+                onNewFilm?.();
+              }}
           >
             Create another film
           </Button>
