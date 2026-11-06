@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./Campaign.json": "./abi/Campaign.json",
+    "./CampaignFactory.json": "./abi/CampaignFactory.json",
+    "./IERC20.json": "./abi/IERC20.json"
   }
 }

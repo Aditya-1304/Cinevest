@@ -1,0 +1,198 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "USDC",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "campaignAt",
+    "inputs": [
+      {
+        "name": "index",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "campaignCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "createCampaign",
+    "inputs": [
+      {
+        "name": "terms",
+        "type": "tuple",
+        "internalType": "struct CampaignTypes.CampaignTerms",
+        "components": [
+          {
+            "name": "creator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "reviewer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "usdc",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "fundingGoal",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "fundingDeadline",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "productionDeadline",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "rightsDuration",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "watchPrice",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "funderBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "repaymentCapBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "pitchReference",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "worldGated",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "perHumanLimit",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "campaign",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "isCampaign",
+    "inputs": [
+      {
+        "name": "campaign",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "CampaignCreated",
+    "inputs": [
+      {
+        "name": "creator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "campaign",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "CampaignIndexOutOfBounds",
+    "inputs": [
+      {
+        "name": "index",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "UnsupportedChain",
+    "inputs": [
+      {
+        "name": "code",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  }
+]
