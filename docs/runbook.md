@@ -21,8 +21,8 @@ Release upload → probe → `configureRelease`. Playback uses signed tokens iss
 ## Metered viewing
 Design and trust boundary: `docs/pay-per-view.md`. Needs `METER_PRIVATE_KEY` funded with Arc gas, `configureMeterSigner` on the factory **before** campaigns are created (campaigns capture the signer; earlier ones stay full-purchase only), and `npm run viewing:settle -w @cinevest/backend` on a schedule, every 5 minutes. If it stops for longer than the 6-hour exit delay, exiting viewers keep unsettled usage; viewer funds are never at risk from the outage. Metered bytes flow through the backend, so size bandwidth accordingly.
 
-## World ID
-Env: `WORLD_APP_ID`, `WORLD_RP_ID`, `WORLD_ACTION`, `WORLD_RP_SIGNING_KEY`, verifier key. The verifier signer is configured once on the factory (`configureWorldVerifierSigner`); a new factory needs it again.
+## World ID (retired)
+Not used by the active build (`docs/cre.md`); kept for legacy World-gated contracts. Env: `WORLD_APP_ID`, `WORLD_RP_ID`, `WORLD_ACTION`, `WORLD_RP_SIGNING_KEY`, verifier key. The verifier signer is configured once on the factory (`configureWorldVerifierSigner`); a new factory needs it again.
 
 ## RPC outages
 Public Arc RPC rate-limits and rejects batches; clients retry with backoff. If down, funding/claims pause; nothing is lost. Discovery marks films "temporarily unverifiable" instead of showing unchecked data.

@@ -1,6 +1,8 @@
 # Testnet fixtures (Arc Testnet, chain 5042002)
 
-Factory: `0x503ccf5a1d873d91e8581042aea002e02f027cd8` (deploy tx `0x5a95464aab0a0f8bbb7899fef7ff634fd73ae5699b2c2d0c100ae54bfbe45dcd`, block 71024966). Look transactions up in the Arc Testnet explorer.
+> These fixtures were created on the **previous** factory and are not compatible with the metered-viewing build. The current factory is in `contracts/deployments/arc-testnet.json`; new fixtures must be created on it.
+
+Factory (previous): `0x503ccf5a1d873d91e8581042aea002e02f027cd8` (deploy tx `0x5a95464aab0a0f8bbb7899fef7ff634fd73ae5699b2c2d0c100ae54bfbe45dcd`, block 71024966). Look transactions up in the Arc Testnet explorer.
 
 ## Failed campaign (P10.2)
 
@@ -14,9 +16,9 @@ Campaign `0x80E1B4c4359B0376A361E7919fEc9E02E7E9314c`: goal 10 USDC, funded 5 US
 
 `refundsPaid() == 5000000` (exact principal). The wallets' on-chain USDC balance rises by slightly less than the refund because USDC is also Arc's gas token. Reproduce: create a campaign with a near deadline, fund below goal from two wallets, call `expire()` after the deadline, then each wallet calls `claimFundingRefund()`. The two refund wallets are throwaway keys kept outside the repo.
 
-## World-gated campaign
+## World-gated campaign (retired)
 
-`0xf9d1613c60E599945aE25A1345539971f490c060`: World-gated, 1 USDC per-human cap, verified first round of 1 human. Live verified funding and second-wallet denial are performed through `/world/5042002/<campaign>` with the staging simulator.
+World verification is retired in the active build (see `docs/cre.md`); this legacy campaign stays only as history. `0xf9d1613c60E599945aE25A1345539971f490c060`: World-gated, 1 USDC per-human cap, verified first round of 1 human. Live verified funding and second-wallet denial are performed through `/world/5042002/<campaign>` with the staging simulator.
 
 ## Other evidence
 

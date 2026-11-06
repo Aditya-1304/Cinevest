@@ -17,6 +17,6 @@ Scope: paid playback, release integrity and what survives provider loss. Finding
 ## Trusted off-chain assumptions
 1. **Mux** enforces signed playback at the CDN and truthfully reports asset status; Cinevest cannot prove the video behind a playback ID is the film beyond the creator's committed hash.
 2. **The reviewer** is trusted to approve milestones honestly (disclosed in the UI); Arc only enforces that approval comes from the committed reviewer wallet.
-3. **The backend** issues playback tokens and, for World-gated campaigns, funding authorizations; it cannot move funds or change stage.
-4. **World ID** staging proofs are test-only; production use requires the production environment and a registered verifier signer on the factory.
+3. **The backend** issues playback tokens and viewing sessions; it cannot move funds or change stage. Metering settlement uses a separate meter signer (`docs/pay-per-view.md`).
+4. **Chainlink CRE** checks Arc commitments and Mux readiness only; it is advisory and does not replace the independent reviewer (`docs/cre.md`). World ID is retired; legacy World-gated contracts remain for old artifacts.
 5. A paying viewer can share a valid token URL for its lifetime (screen/URL sharing is not preventable by any web DRM-free setup).

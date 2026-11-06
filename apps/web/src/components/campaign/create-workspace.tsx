@@ -55,7 +55,7 @@ export function CreateWorkspace() {
   }, [step]);
   return (
     <section className="w-full" aria-labelledby="create-title">
-      <div className="mb-5 block gap-6 min-[761px]:flex min-[761px]:items-start min-[761px]:justify-between [&_h1]:max-w-[700px] [&>div:first-child>p:last-child]:max-w-[590px]">
+      <div className="mb-5 block gap-6 min-[761px]:flex min-[761px]:items-start min-[761px]:justify-between [&_h1]:max-w-175 [&>div:first-child>p:last-child]:max-w-[590px]">
         <div>
           <p className="text-xs font-bold !text-[#d3ed05]">Creator workspace</p>
           <h1 id="create-title" className="!my-2 !text-[clamp(28px,3vw,40px)]">
@@ -67,7 +67,7 @@ export function CreateWorkspace() {
           </p>
         </div>
         <div className="mt-6 min-w-[210px] text-xs min-[761px]:mt-0 min-[761px]:max-w-[300px]">
-          <WalletConnect />
+          <WalletConnect compact />
         </div>
       </div>
       <div className="grid grid-cols-1 overflow-hidden rounded-2xl border border-white/10 bg-[#04141C] min-[761px]:grid-cols-[200px_minmax(0,1fr)]">
@@ -99,7 +99,7 @@ export function CreateWorkspace() {
         <div className="p-4 min-[761px]:px-5 min-[761px]:py-4">
           {/* Keep both steps mounted so navigating back preserves draft inputs. */}
           <div hidden={step !== 0}>
-            <div className="[&_h2:focus-visible]:outline-2 [&_h2:focus-visible]:outline-offset-4 [&_h2:focus-visible]:outline-[#d3ed05]/80 [&_h2]:my-1 [&_h2]:text-[clamp(24px,2.3vw,30px)] [&_p]:text-[13px] [&_span]:text-[11px] [&_span]:font-bold [&_span]:text-[#d3ed05]">
+            <div className="mb-4 [&_h2:focus-visible]:outline-2 [&_h2:focus-visible]:outline-offset-4 [&_h2:focus-visible]:outline-[#d3ed05]/80 [&_h2]:my-1 [&_h2]:text-[clamp(24px,2.3vw,30px)] [&_p]:text-[13px] [&_span]:text-[11px] [&_span]:font-bold [&_span]:text-[#d3ed05]">
               <span>Step 01 / 02</span>
               <h2 ref={proposalHeading} tabIndex={-1}>
                 Start with the story.
@@ -131,7 +131,8 @@ export function CreateWorkspace() {
                 <Label htmlFor="film-pitch">Pitch</Label>
                 <Textarea
                   id="film-pitch"
-                  rows={4}
+                  className="min-h-14"
+                  rows={2}
                   maxLength={SYNOPSIS_UI_MAX}
                   placeholder="Tell supporters about your film"
                   value={proposal.synopsis}
@@ -141,7 +142,7 @@ export function CreateWorkspace() {
                   {proposal.synopsis.length}/{SYNOPSIS_UI_MAX} characters
                 </small>
               </div>
-              <div className="grid gap-1.5 min-[761px]:col-span-2">
+              <div className="grid content-start gap-1.5">
                 <Label htmlFor="reviewer">Independent reviewer wallet</Label>
                 <Input
                   id="reviewer"
@@ -150,7 +151,7 @@ export function CreateWorkspace() {
                   onChange={(event) => setReviewer(event.target.value)}
                 />
               </div>
-              <div className="grid gap-1.5 min-[761px]:col-span-2">
+              <div className="grid content-start gap-1.5">
                 <Label htmlFor="film-poster">Poster image</Label>
                 <Input
                   key={`poster-${formKey}`}
@@ -173,6 +174,7 @@ export function CreateWorkspace() {
                 <Label htmlFor="film-rights">Rights notice</Label>
                 <Textarea
                   id="film-rights"
+                  className="min-h-14"
                   rows={2}
                   value={proposal.rightsNotice}
                   onChange={(event) => edit({ rightsNotice: event.target.value })}
@@ -193,13 +195,13 @@ export function CreateWorkspace() {
             </div>
           </div>
           <div hidden={step !== 1}>
-            <div className="[&_h2:focus-visible]:outline-2 [&_h2:focus-visible]:outline-offset-4 [&_h2:focus-visible]:outline-[#d3ed05]/80 [&_h2]:my-1 [&_h2]:text-[clamp(24px,2.3vw,30px)] [&_p]:text-[13px] [&_span]:text-[11px] [&_span]:font-bold [&_span]:text-[#d3ed05]">
+            <div className="mb-4 [&_h2:focus-visible]:outline-2 [&_h2:focus-visible]:outline-offset-4 [&_h2:focus-visible]:outline-[#d3ed05]/80 [&_h2]:my-1 [&_h2]:text-[clamp(24px,2.3vw,30px)] [&_p]:text-[13px] [&_span]:text-[11px] [&_span]:font-bold [&_span]:text-[#d3ed05]">
               <span>Step 02 / 02</span>
               <h2 ref={financeHeading} tabIndex={-1}>
                 Set the terms.
               </h2>
               <p>
-                Define how funding and eligible receipts work for your film.
+                Define how funding and receipts work. Terms are immutable; backer returns are capped, not guaranteed.
               </p>
             </div>
             <FinanceTermsForm key={formKey} reviewer={reviewer} proposal={proposal} onNewFilm={resetForNewFilm} />

@@ -26,12 +26,12 @@ const fields = [
   },
   {
     name: "funderBps",
-    label: "Backer share (basis points)",
+    label: "Backer share (bps)",
     hint: "10,000 basis points = 100%",
   },
   {
     name: "repaymentCapBps",
-    label: "Backer repayment cap (basis points)",
+    label: "Repayment cap (bps)",
     hint: "15,000 basis points = 1.5× the funding goal",
   },
   {
@@ -136,6 +136,16 @@ export function FinanceTermsForm({
     reviewer !== zeroAddress &&
     reviewer.toLowerCase() !== address?.toLowerCase();
   const issue = proposalIssue(proposal);
+  /** Single most relevant reason publishing is blocked, so the form shows one status line. */
+  const blocker = !reviewerValid
+    ? "Add a valid independent reviewer wallet in the proposal step."
+    : issue && !hasProgress
+      ? issue
+      : !address
+        ? "Connect your wallet on Arc Testnet to publish."
+        : chainId !== ARC_TESTNET.id
+          ? "Switch to Arc Testnet to publish."
+          : null;
 
   /** World gating needs a per-human cap; an optional verified first round counts unique humans. */
   function validateWorld() {
@@ -220,13 +230,9 @@ export function FinanceTermsForm({
       noValidate
       className="mt-2 text-white [&_p]:text-xs [&_p]:leading-[1.4] [&_p]:text-white/60"
     >
-      <p>
-        These terms are intended to be immutable. Backer returns are capped and
-        are not guaranteed.
-      </p>
-      <div className="grid grid-cols-1 gap-x-3 min-[561px]:grid-cols-2 min-[1000px]:grid-cols-3">
-        {fields.map((field) => (
-          <div className="my-1 grid min-w-0 content-start gap-1.5 [&_small]:text-[10px] [&_small]:text-white/50" key={field.name}>
+      <div className="grid grid-cols-1 gap-x-3 gap-y-2 min-[561px]:grid-cols-2 min-[1000px]:grid-cols-12">
+        {fields.map((field, index) => (
+          <div className={`my-0.5 grid ${index < 4 ? "min-[1000px]:col-span-3" : "min-[1000px]:col-span-4"} min-w-0 content-start gap-1.5 [&_small]:text-[10px] [&_small]:text-white/50`} key={field.name}>
             <Label htmlFor={field.name}>{field.label}</Label>
             <Input
               id={field.name}
@@ -255,11 +261,11 @@ export function FinanceTermsForm({
         ))}
       </div>
       <fieldset
-        className="mt-3 space-y-2 rounded-xl border border-white/10 p-3 [&_label]:text-xs [&_small]:text-[10px] [&_small]:text-white/50"
+        className="mt-2 space-y-2 rounded-xl border border-white/10 px-3 py-2 [&_label]:text-xs [&_small]:text-[10px] [&_small]:text-white/50"
         disabled
       >
         <legend className="px-1 text-xs font-bold text-white">Legacy World funding (unavailable)</legend>
-        <label className="flex items-center gap-2 font-bold">
+        <label className="flex flex-wrap items-center gap-x-3 gap-y-1 font-bold">
           <Input
             type="checkbox"
             checked={world.gated}
@@ -268,14 +274,10 @@ export function FinanceTermsForm({
               setValid(false);
             }}
           />
-          Require World ID verification to fund this film
+          Require World ID to fund (one wallet per verified human, up to a cap)
         </label>
-        <p>
-          Each verified human can fund from one wallet only, up to a cap you set. Funders verify
-          once on the campaign page before contributing.
-        </p>
         {world.gated && (
-          <div className="grid gap-2 min-[561px]:grid-cols-2">
+          <div className="grid gap-x-3 gap-y-2 min-[561px]:grid-cols-2">
             <div className="grid gap-1">
               <label htmlFor="worldLimit" className="font-bold">
                 Cap per human (test USDC)
@@ -318,49 +320,23 @@ export function FinanceTermsForm({
           </div>
         )}
       </fieldset>
-      <button
-        className="hover:border-[#e4ff1a] hover:bg-[#e4ff1a] mt-2 inline-flex h-9 items-center justify-center rounded-lg border border-[#d3ed05] bg-[#d3ed05] px-4 text-xs font-bold text-black transition"
-        type="submit"
-      >
-        Review terms
-      </button>
-      {valid && (
-        <p role="status">
-          Finance fields are valid. Review the immutable terms before publishing.
-        </p>
-      )}
-      <p className="mt-1">
-        Publishing uploads your poster and pitch to Swarm, deploys the campaign
-        on Arc Testnet and lists it on Arkiv. You will be asked to sign several
-        messages and two transactions.
+      <p role="status" className="mt-2">
+        {blocker ?? (valid
+          ? "Terms look valid. Review them, then publish: this uploads to Swarm, deploys on Arc and lists on Arkiv (several signatures and two transactions)."
+          : "Publishing uploads to Swarm, deploys on Arc Testnet and lists on Arkiv (several signatures and two transactions).")}
       </p>
-      {!reviewerValid && (
-        <p role="status">
-          Add a valid independent reviewer wallet in the proposal step.
-        </p>
+      {address && chainId !== ARC_TESTNET.id && (
+        <Button
+          className="h-9 min-h-9 text-xs"
+          disabled={switchChain.isPending}
+          onClick={() =>
+            switchChain.switchChain({ chainId: ARC_TESTNET.id })
+          }
+        >
+          {switchChain.isPending ? "Switching…" : "Switch to Arc Testnet"}
+        </Button>
       )}
-      {issue && !hasProgress && <p role="status">{issue}</p>}
-      {(!address || chainId !== ARC_TESTNET.id) && (
-        <div className="mt-1 space-y-2">
-          <p>
-            {address
-              ? "Switch to Arc Testnet to publish."
-              : "Connect your wallet on Arc Testnet to publish."}
-          </p>
-          {address && chainId !== ARC_TESTNET.id && (
-            <Button
-              className="h-9 min-h-9 text-xs"
-              disabled={switchChain.isPending}
-              onClick={() =>
-                switchChain.switchChain({ chainId: ARC_TESTNET.id })
-              }
-            >
-              {switchChain.isPending ? "Switching…" : "Switch to Arc Testnet"}
-            </Button>
-          )}
-        </div>
-      )}
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-3">
         {hasProgress ? (
           <>
             <Button
@@ -395,6 +371,14 @@ export function FinanceTermsForm({
           </>
         ) : (
           !published && (
+            <>
+            <button
+              className="inline-flex h-9 items-center justify-center rounded-lg border border-[#d3ed05] bg-[#d3ed05] px-4 text-xs font-bold text-black transition hover:border-[#e4ff1a] hover:bg-[#e4ff1a] disabled:opacity-50"
+              type="submit"
+              disabled={publication.running || starting}
+            >
+              Review terms
+            </button>
             <Button
               className="h-9 min-h-9 text-xs"
               disabled={
@@ -412,6 +396,7 @@ export function FinanceTermsForm({
                 ? "Publishing…"
                 : "Publish campaign"}
             </Button>
+            </>
           )
         )}
       </div>

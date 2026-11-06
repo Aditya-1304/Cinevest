@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -45,6 +46,19 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
     return () => target.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Close the wallet dialog once a connection completes, and on Escape.
+  const wasConnected = useRef(!!address);
+  useEffect(() => {
+    if (address && !wasConnected.current && walletOpen) setWalletOpen(false); // eslint-disable-line react-hooks/set-state-in-effect -- close after connect completes
+    wasConnected.current = !!address;
+  }, [address, walletOpen]);
+  useEffect(() => {
+    if (!walletOpen) return;
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setWalletOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [walletOpen]);
+
   const short = address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "";
   const wrongNetwork = !!address && chainId !== ARC_TESTNET.id;
 
@@ -64,10 +78,11 @@ export function AppHeader({ compact = false }: { compact?: boolean }) {
         )}
       >
         <Link
-          className="font-dela inline-flex items-center text-2xl text-white"
+          className="font-dela inline-flex items-center gap-2 text-2xl text-white"
           href="/"
         >
-          cinevest<span className="text-[#d3ed05]">.</span>
+          <Image src="/brand/logo-mark.png" alt="" width={32} height={32} priority className="size-8" />
+          <span>cinevest<span className="text-[#d3ed05]">.</span></span>
         </Link>
         <nav
           className={cn("order-3 flex w-full flex-col gap-1 text-sm font-medium text-white/75 min-[761px]:order-none min-[761px]:justify-self-center min-[761px]:w-auto min-[761px]:flex-row min-[761px]:items-center min-[761px]:gap-7 [&_a:hover]:text-[#d3ed05] [&_a]:transition [&_a[aria-current=page]]:font-semibold [&_a[aria-current=page]]:text-[#d3ed05]", menuOpen ? "" : "hidden min-[761px]:flex")}
