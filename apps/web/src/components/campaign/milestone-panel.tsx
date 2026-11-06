@@ -4,6 +4,7 @@ import {
   useAccount,
   usePublicClient,
   useReadContracts,
+  useReadContract,
   useSwitchChain,
   useWriteContract,
 } from "wagmi";
@@ -15,7 +16,7 @@ import {
   type Hex,
 } from "viem";
 import { ARC_TESTNET, type CampaignTerms } from "@/lib/chain";
-import { campaignAbi } from "@cinevest/abi";
+import { campaignAbi, thresholdReviewerAbi } from "@cinevest/abi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReleaseGateStatus, useReleaseGate } from "@/components/campaign/release-gate";
@@ -166,7 +167,7 @@ export function MilestonePanel({
       : !roughCutApproved
         ? "Approve the rough cut first: the final delivery opens only after that approval."
         : !releaseConfigured
-          ? "Final approval also needs a configured film release, which arrives with the Livepeer step."
+          ? "Final approval needs a configured Mux release and a passing Chainlink CRE review."
           : undefined;
   const readsFailed =
     reads.isError || reads.data?.some((read) => read.status === "failure");
@@ -180,10 +181,16 @@ export function MilestonePanel({
     dispute !== undefined;
   const creator = address?.toLowerCase() === terms.creator.toLowerCase();
   const reviewer = address?.toLowerCase() === terms.reviewer.toLowerCase();
-  // Release gate (trusted off-chain evidence) runs for the reviewer on final delivery only.
+  const committee = useReadContract({
+    address: terms.reviewer, abi: thresholdReviewerAbi, functionName: "isSigner",
+    args: [address ?? zeroAddress], chainId: ARC_TESTNET.id,
+    query: { enabled: !!address && !creator && !reviewer },
+  });
+  const canInspect = creator || reviewer || committee.data === true;
+  // Creators and committee signers can inspect the same report before the reviewer authorizes release.
   const gate = useReleaseGate(
     campaign,
-    reviewer && stage === 2 && index === 2 && !finalBlockedMessage,
+    canInspect && stage === 2 && index === 2 && !finalBlockedMessage,
   );
   const [releaseBlock, setReleaseBlock] = useState<string>();
 
@@ -243,8 +250,8 @@ export function MilestonePanel({
     // Final delivery must pass the release gate again right before the approval is sent.
     if (action === "approveStage" && index === 2) {
       setReleaseBlock(undefined);
-      const outcome = await gate.recheck(true);
-      if (outcome.status !== "passed") {
+      const outcome = await gate.recheck();
+      if (outcome.status !== "passed" || outcome.cre?.evidenceHash.toLowerCase() !== evidence.toLowerCase()) {
         setReleaseBlock(
           outcome.reason ??
             "The film release did not pass the final-delivery checks, so the approval was not sent.",
@@ -460,7 +467,7 @@ export function MilestonePanel({
           {reviewer && finalBlockedMessage && (
             <p className="text-xs text-amber-300">{finalBlockedMessage}</p>
           )}
-          {reviewer && stage === 2 && index === 2 && !finalBlockedMessage && (
+          {canInspect && stage === 2 && index === 2 && !finalBlockedMessage && (
             <ReleaseGateStatus gate={gate} />
           )}
           <div className="flex flex-wrap gap-3">

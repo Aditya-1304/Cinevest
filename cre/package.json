@@ -1,0 +1,17 @@
+{
+  "name": "cinevest-cre",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "bun x cre-compile release-readiness/main.ts release-readiness/workflow.wasm",
+    "simulate": "cre workflow simulate release-readiness --target local-simulation --non-interactive --trigger-index 0",
+    "runner": "node runner.mjs"
+  },
+  "dependencies": {
+    "@chainlink/cre-sdk": "1.23.0",
+    "viem": "^2.38.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": { "typescript": "^5.9.3" }
+}

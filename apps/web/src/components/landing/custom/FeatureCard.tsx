@@ -119,17 +119,17 @@ const FeatureCard = () => {
             >
                 <div className='text-left p-6 md:p-10 pb-0'>
                     <h2 className='text-3xl md:text-4xl font-dela font-bold text-white uppercase'>
-                        One Human,
+                        Ready For
                         <br />
-                        One Vote
+                        Release
                     </h2>
                     <p className='font-light text-md text-[#FFFFFF]/70 mt-5 leading-relaxed'>
-                        Creators can gate a campaign with World ID so
+                        Chainlink CRE checks Arc commitments and Mux readiness
                         <br />
-                        each verified human backs once, not a bot farm.
+                        before human reviewers approve the final milestone.
                     </p>
                 </div>
-                <LogoPanel src="/landing/logos/world.svg" alt="World ID" invert items={["Proof of personhood", "Per-human limits", "Optional gating"]} />
+                <div className="m-6 rounded-2xl border border-white/10 p-6 text-center text-white"><p className="text-xl font-bold">Chainlink CRE</p><p className="mt-2 text-sm text-white/70">Arc + Mux checks · CLI simulation · Human review</p></div>
             </motion.div>
 
             {/* CARD 4 (Bottom Right - Call to Action) */}

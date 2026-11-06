@@ -13,7 +13,10 @@
     "contracts:build": "cd contracts && forge build",
     "contracts:test": "cd contracts && forge test",
     "contracts:abi": "npm run contracts:build && node scripts/generate-abi.mjs",
-    "contracts:deploy:arc": "NODE_USE_ENV_PROXY=1 node scripts/deploy-arc.mjs"
+    "contracts:deploy:arc": "NODE_USE_ENV_PROXY=1 node scripts/deploy-arc.mjs",
+    "cre:typecheck": "npm run typecheck --prefix cre",
+    "cre:build": "npm run build --prefix cre",
+    "cre:runner": "npm run runner --prefix cre"
   },
   "devDependencies": {
     "@foundry-rs/forge": "1.7.1",

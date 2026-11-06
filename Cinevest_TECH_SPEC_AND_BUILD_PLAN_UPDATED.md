@@ -1,5 +1,8 @@
 # Cinevest: Technical Specification and Hackathon Build Plan
 
+> **Active integration amendment (2026-11-06):** Chainlink CRE replaces World as the third sponsor integration; Mux replaces Livepeer as the media provider. New campaigns use public funding without unique-human claims. CRE's authenticated local simulation checks Arc + Mux and previews final milestone approval, while the independent reviewer retains onchain authority. Historical World/Livepeer sections below describe the prior design and do not override this amendment. Setup, trust boundaries and remaining live acceptance: `docs/cre.md`.
+
+
 > **Status:** Implementation blueprint, not deployed code. **Research checked:** 2026-11-03. **Event:** ETHGlobal Mumbai 2026. **Environment:** publicly accessible web application; **Arc Testnet + Arkiv Rabdi Testnet only**; no mainnet, real investment offering, or production-money flow.
 >
 > **Build rule:** Classic / From Scratch. Begin project-specific code only when ETHGlobal's official hacking window opens. Both teammates must register in the same participation track. Sponsor selections are limited by event rules; confirm the selections in the submission UI.
@@ -28,7 +31,7 @@
 |---|---|---|---|
 | **Arc** | **Best Smart Contracts with Advanced Stablecoin Logic, In Arc Studio** | USDC escrow, milestone releases, revenue waterfall and capped claims | Begin in **Arc Studio**; shareable Studio project URL; show Studio in demo; Arc Testnet addresses, tests, frontend/backend, architecture diagram, GitHub and short video |
 | **Arkiv** | **Build on Arkiv (from scratch)** | Indexed, expiring campaign listings actually queried in the user-facing marketplace | Entity write **and actual read**, author wallet(s), reproducible query, `arkiv/schema.md`, `arkiv/friction.md`, `arkiv/reach.md`, `arkiv/why-arkiv.md`, `arkiv/how-you-use-arkiv.md`; public licensed repo; disclose AI usage |
-| **World** | **Best Use of IDKit** | Unique-human verification before scarce early funding allocation, rather than decorative login | Official IDKit; protected action; backend verification; successful and denied/cancelled/expired demo paths; brief integration feedback |
+| **Chainlink** | **Best workflow with CRE ($1,500)** | Arc campaign state + Mux delivery checks orchestrated before final review | Native CRE workflow source, successful CLI simulation with real Arc/Mux reads, redacted report integrated into the review UI; disclose local simulation and human reviewer authority |
 | **Arkiv bonus, not fourth partner** | **Arkiv + Swarm bonus (from scratch)** | Public proposal/milestone files stored on Swarm and referenced from Arkiv | `arkiv/swarm.md` with entity key, accessible reference, batch ID, Bee uploader, wallet, upload/read steps, code paths, demo timestamp, friction |
 
 **Prize selection is a submission configuration, not a requirement to deploy four chains.** The event's up-to-three partner selection rule and same-participation-track rule remain binding. Use current [ETHGlobal Mumbai prizes](https://ethglobal.com/events/mumbai/prizes) immediately before submission; bounty amounts and details may change.
@@ -44,8 +47,8 @@
 | ERC-20 USDC | `0x3600000000000000000000000000000000000000` | Verify on current Arc docs; do **not** use native-gas units in payout math |
 | Discovery DB | **Arkiv Rabdi**, chain ID **7794095**, `@arkiv-network/sdk` | tGLM for Arkiv writes; read/write endpoints and access keys from current Arkiv docs |
 | Proposal/evidence storage | Swarm through Bee-compatible upload service | Public, content-addressed poster/pitch/milestone manifest, **not** the paywalled film |
-| Streaming | Livepeer Studio, video-on-demand | Private API credentials server-side; test supported JWT/webhook asset playback policy before relying on it |
-| Identity | World IDKit Proof of Human, server verifier | Hackathon mock proofs are **not production identity assurance** |
+| Streaming | Mux, video-on-demand | Signed-only playback, server-side credentials and delivery probes; CRE uses a separate Video read-only token |
+| Release orchestration | Chainlink CRE CLI simulation | Arc state + direct Mux API checks; human reviewer approval remains authoritative; public funding has no unique-human guarantee |
 | Auth | EIP-4361 SIWE + signed nonce, secure session cookies | Bind site domain, wallet, chain, expiry and nonce |
 | Minimal application persistence | Neon or Supabase Postgres (server only) | Workflow journal/reconciliation, SIWE challenges, upload attempts, selected release, proof replay/idempotency; never authoritative for economic balances |
 | Hosting keys | Deployment secret manager | Keep Studio/API/World/signing keys out of `NEXT_PUBLIC_*` and the repository |
@@ -682,7 +685,7 @@ The following extensions increase depth without changing the core settlement mod
 - [ ] **P12.2 (B):** Add independently runnable read-only **Arkiv film explorer** route with cross-creator discovery. **Done:** real search works without Cinevest server's SQL tables.
 - [ ] **P12.3 (A):** Add third-party **sponsor USDC deposit** under independently approved conditions, feeding the existing waterfall. **Done:** deposited money is received onchain before any splitting; no fictitious YouTube income.
 - [ ] **P12.4 (A):** Add a **claim accounting trace** export from contract events that reproduces individual payouts. **Done:** CLI reconciles Arc logs and balances.
-- [ ] **P12.5 (B):** Add a **portable manifest explorer** showing pitch/milestones from Swarm and querying Arkiv directly. **Done:** independent read-only viewer needs no private service token.
+- [ ] **P12.5 (B):** Add a **portable manifest explorer** showing pitch/milestones from Swarm and qugit erying Arkiv directly. **Done:** independent read-only viewer needs no private service token.
 - [ ] **P12.6 (Both):** Add reviewer multisig signature threshold for milestone approval instead of a single reviewer, preserving stage invariants. **Done:** fewer than threshold signers cannot release escrow.
 - [ ] **P12.7 (B) [NEW, OPTIONAL]:** Extract the Phase 7 journal reconciler into a scheduled/background worker only if real workflow volume requires it. **Done:** retries remain idempotent across worker restart and concurrent execution.
 - [ ] **P12.8 (B) [NEW, OPTIONAL]:** Add independently verifiable Arc/Arkiv/Swarm/Livepeer consistency report for third-party explorers. **Done:** exporter never requires private media credentials or reveals them.

@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authenticate } from "@/lib/auth/session";
-import { readCampaignMedia } from "@/lib/media/arc";
+import { canInspectRelease, readCampaignMedia } from "@/lib/media/arc";
 import { arcChainId, campaignAddress } from "@/lib/media/input";
 import { verifyRelease } from "@/lib/media/verify-release";
+
+export const maxDuration = 180;
 
 const querySchema = z.object({ arcChainId, campaignAddress });
 
@@ -17,7 +19,7 @@ export async function GET(request: Request) {
   try {
     const campaign = await readCampaignMedia(query.data.campaignAddress);
     if (!campaign) return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
-    if (session.address !== campaign.creator && session.address !== campaign.reviewer) {
+    if (!await canInspectRelease(session.address, campaign.creator, campaign.reviewer)) {
       return NextResponse.json({ error: "Only the creator or reviewer may verify the release" }, { status: 403 });
     }
     return NextResponse.json(await verifyRelease(query.data.arcChainId, query.data.campaignAddress, campaign.onchainHash), { headers: { "cache-control": "no-store" } });

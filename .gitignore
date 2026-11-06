@@ -9,3 +9,5 @@ broadcast/
 .vercel/
 coverage/
 .DS_Store
+
+.tools/

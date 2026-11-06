@@ -28,9 +28,9 @@ const Feature = () => {
                         />
                     </h2>
                     <p className='font-light text-lg text-[#FFFFFF]/70 mt-5'>
-                        Arc for settlement, Arkiv for discovery and World ID
+                        Arc for settlement, Arkiv for discovery and Chainlink CRE
                         <br />
-                        for verified humans: the stack behind every campaign.
+                        for release readiness: the stack behind every campaign.
                     </p>
                 </div>
                 <div className='mt-10 overflow-hidden'>

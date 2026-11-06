@@ -85,13 +85,10 @@ export function BuyAccess({
   const ready =
     !!address && !flow.busy && flow.state !== "uncertain" && !readsFailed;
   const price = terms.watchPrice;
-  // The current contract imposes no World gate on purchases, but a gated
-  // campaign can still not be sold in the client until the Phase 9 verifier.
-  const worldBlocked = terms.worldGated;
   const insufficient =
     balance !== undefined && balance < price;
   const canBuy =
-    ready && !worldBlocked && !insufficient && balance !== undefined;
+    ready && !insufficient && balance !== undefined;
 
   async function purchase() {
     if (!ready || !address || !client || insufficient === true) return;
@@ -148,9 +145,7 @@ export function BuyAccess({
     }
   }
 
-  const blockedHint = worldBlocked
-    ? "This campaign needs World ID verification, which is not available yet."
-    : insufficient
+  const blockedHint = insufficient
       ? `This wallet holds only ${formatUsdc(balance ?? 0n)} test USDC, less than the viewing price.`
       : balance === undefined
         ? "Loading wallet balance…"

@@ -256,9 +256,9 @@ export function FinanceTermsForm({
       </div>
       <fieldset
         className="mt-3 space-y-2 rounded-xl border border-white/10 p-3 [&_label]:text-xs [&_small]:text-[10px] [&_small]:text-white/50"
-        disabled={hasProgress || published}
+        disabled
       >
-        <legend className="px-1 text-xs font-bold text-white">Fair funding with World ID</legend>
+        <legend className="px-1 text-xs font-bold text-white">Legacy World funding (unavailable)</legend>
         <label className="flex items-center gap-2 font-bold">
           <Input
             type="checkbox"

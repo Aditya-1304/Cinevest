@@ -1,5 +1,6 @@
 import "server-only";
-import { ARC_TESTNET_DEPLOYMENT, campaignAbi, campaignFactoryAbi } from "@cinevest/abi";
+import { type Address } from "viem";
+import { thresholdReviewerAbi, ARC_TESTNET_DEPLOYMENT, campaignAbi, campaignFactoryAbi } from "@cinevest/abi";
 import { verifiedArcClient } from "@/lib/arkiv/arc-client";
 
 const RELEASED = 3;
@@ -30,4 +31,15 @@ export async function readCampaignMedia(campaign: `0x${string}`, wallet?: `0x${s
     // Contract rejects configureRelease once final evidence is approved, so the offchain selection locks at the same point.
     locked: stage === RELEASED || stage === CANCELLED_PRODUCTION || (raised > 0n && approved >= raised),
   };
+}
+
+
+/** Committee signers may inspect redacted readiness evidence; approval still requires threshold signatures. */
+export async function canInspectRelease(wallet: string, creator: string, reviewer: string) {
+  if (wallet === creator || wallet === reviewer) return true;
+  try {
+    const client = await verifiedArcClient();
+    return await client.readContract({ address: reviewer as Address, abi: thresholdReviewerAbi,
+      functionName: "isSigner", args: [wallet as Address] });
+  } catch { return false; }
 }

@@ -17,8 +17,8 @@ Web: http://localhost:3000. Backend: http://localhost:3001. The web app proxies 
 
 ## Workspace
 
-- `apps/web`: Next.js App Router, Tailwind CSS 4, shadcn-compatible UI, wagmi/viem and World IDKit dependencies. Add components with `npx shadcn@latest add <component>` from this directory.
-- `apps/backend`: Next.js route handlers; Arkiv SDK, SIWE, JOSE and Postgres dependencies. Livepeer and Bee integrations can use server-side fetch.
+- `apps/web`: Next.js App Router, Tailwind CSS 4, shadcn-compatible UI, wagmi/viem and the CRE release-review UI. Add components with `npx shadcn@latest add <component>` from this directory.
+- `apps/backend`: Next.js route handlers; Arkiv SDK, SIWE, JOSE and Postgres dependencies. Mux and Bee integrations use server-side credentials.
 - `contracts`: Foundry configuration. Create the Arc Studio starting project before importing contracts here, as required by the spec. Install Foundry separately, then use `npm run contracts:build` and `npm run contracts:test`.
 - `packages/abi`: reserved for generated contract ABIs; no fabricated contract interface.
 - `arkiv`: Arkiv schema and sponsor criterion files (`schema.md`, `reach.md`, `why-arkiv.md`, `how-you-use-arkiv.md`, `friction.md`, `swarm.md`).
@@ -30,26 +30,33 @@ The governing build plan and per-phase evidence describe the implemented capabil
 
 Before publishing, choose a license, review the specification and add required hackathon AI-use disclosures. Git initialization, commits, pushes and deployment remain user-controlled.
 
-## World ID fair funding
+## Chainlink CRE + Mux release review
 
-Phase 9 code now includes server-side proof verification, durable EIP-712 funding
-permissions and the gated contribution UI. See [implementation and activation](docs/world/phase-9-completion.md)
-and the [World integration debrief](docs/world/debrief.md). Live World proof and
-matching-deployment acceptance remain outstanding; incompatible funding is disabled.
+The active sponsor integration is Arc + Arkiv + Chainlink. CRE reads Arc campaign
+state, queries Mux directly and previews final milestone approval before the human
+reviewer signs. The UI exposes a redacted simulation report; no production-oracle
+or proof-of-humanity claim is made.
+
+See [CRE setup and trust boundaries](docs/cre.md). Run `npm ci --prefix cre`,
+`npm run cre:build`, configure the private runner environment, then run
+`npm run cre:runner` alongside `npm run dev`.
+
+World verification endpoints are retired. Existing World-gated contracts retain
+their immutable restrictions; new campaigns use public funding.
 
 ## Architecture
 
-Arc Testnet (USDC) settles funding, milestones and access purchases in the Campaign/CampaignFactory contracts. The creator's wallet lists a film on Arkiv (Rabdi); pitch, poster and evidence bytes live on Swarm with digests committed on Arc; Mux serves the paywalled film through signed playback tokens issued only after on-chain purchase; Postgres holds the journal, sessions and World challenges. See [arkiv/schema.md](arkiv/schema.md).
+Arc Testnet (USDC) settles funding, milestones and access purchases in the Campaign/CampaignFactory contracts. The creator's wallet lists a film on Arkiv (Rabdi); pitch, poster and evidence bytes live on Swarm with digests committed on Arc; Mux serves the paywalled film through signed playback tokens issued only after on-chain purchase; Postgres holds the journal and wallet sessions; Chainlink CRE checks Arc and Mux before final review. See [arkiv/schema.md](arkiv/schema.md).
 
 ## Sponsor integrations
 
 - **Arc:** factory `0x503ccf5a1d873d91e8581042aea002e02f027cd8` (manifest: `contracts/deployments/arc-testnet.json`).
 - **Arkiv + Swarm:** see the `arkiv/` files.
-- **World ID:** gated funding, verified first round, one-human-one-wallet cap; see `docs/world/`.
+- **Chainlink CRE:** Arc + Mux release-readiness workflow; see `docs/cre.md`.
 
 ## Environment
 
-Copy the `.env.example` files, then fill `apps/backend/.env.local` (database, Arc RPC, Swarm, session secret, Mux, Arkiv key, World ID) and `apps/web/.env.local` (`NEXT_PUBLIC_WORLD_APP_ID`, `NEXT_PUBLIC_WORLD_ACTION`). Never commit them.
+Copy the `.env.example` files, then fill `apps/backend/.env.local` (database, Arc RPC, Swarm, session secret, Mux, Arkiv key, CRE runner) and `cre/.env` (private runner settings). Never commit them.
 
 ## Demo flows
 
@@ -61,4 +68,4 @@ This project was built with AI coding assistance (Claude, plus other models unde
 
 ## Creator form
 
-`/create` has two steps: the film proposal (title, genre, pitch up to 2,000 characters, independent reviewer, poster, rights notice) and the finance terms, including optional World ID gating (per-human cap and an optional verified first round). Form controls use shadcn-style `Input`, `Textarea` and `Label` from `apps/web/src/components/ui`, which also style the native poster file picker. The form grows with its content, resets to an empty form after a film is published or set aside ("Create another film" / "Start a new film instead"), and long pitches are clamped with "Read more" on film pages. Non-landing pages use a faint grid backdrop; the landing page keeps its own.
+`/create` has two steps: the film proposal (title, genre, pitch up to 2,000 characters, independent reviewer, poster, rights notice) and the finance terms, with public funding. Legacy World settings are disabled because the active integration uses CRE. Form controls use shadcn-style `Input`, `Textarea` and `Label` from `apps/web/src/components/ui`, which also style the native poster file picker. The form grows with its content, resets to an empty form after a film is published or set aside ("Create another film" / "Start a new film instead"), and long pitches are clamped with "Read more" on film pages. Non-landing pages use a faint grid backdrop; the landing page keeps its own.

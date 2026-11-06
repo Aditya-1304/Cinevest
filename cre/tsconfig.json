@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "target": "ESNext", "module": "ESNext", "moduleResolution": "bundler",
+    "strict": true, "noEmit": true, "types": [], "skipLibCheck": true,
+    "lib": ["ESNext"], "allowImportingTsExtensions": true
+  },
+  "include": ["protocol.ts", "release-readiness/**/*.ts"]
+}
