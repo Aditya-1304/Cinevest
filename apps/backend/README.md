@@ -64,7 +64,13 @@ No files under `apps/web` were changed by this backend work.
 | `GET /api/workflows/:operationId?actor=&issuedAt=&signature=` | Creator-signed operation recovery lookup |
 | `POST /api/listings/extend` | Creator-only renewal preflight and durable confirmation/reconciliation |
 | `GET /api/auth/nonce` | Issues a five-minute, one-time SIWE nonce |
-| `POST /api/auth/verify` | Verifies an EOA SIWE signature and returns its address and chain ID; it creates no session |
+| `POST /api/auth/verify` | Verifies an EOA SIWE signature, returns its address and chain ID, and starts the cookie session |
+| `GET /api/auth/session` | Protected: returns the signed-in wallet, `401` for guests |
+| `POST /api/auth/logout` | Clears the session cookie |
+| `POST /api/media/uploads` | Creator session: starts or resumes (same `attemptKey`) a direct-to-Livepeer upload; returns the upload URLs |
+| `GET /api/media/uploads/:id` | Owner session: reconciles with Livepeer and reports the real status (`pending/uploading/processing/ready/failed`) |
+| `GET /api/media/release?arcChainId=&campaignAddress=` | Public: selected release hash, lock state, and whether it equals Arc `livepeerPlaybackIdHash` |
+| `POST /api/media/release` | Creator session: selects exactly one provider-ready upload and returns the hash for `configureRelease` |
 | `POST /api/arkiv-rpc` | Bounded allowlist relay for creator-signed Rabdi transactions; no server signing |
 
 All signed requests use `publicationMessage(payloadWithoutSignature)` from
@@ -159,3 +165,33 @@ USDC, chain, and receipt, archives the prior manifest, and regenerates shared
 exports. `arcTestnetDeployment.compatible` is false until the manifest matches the
 compiled revision. Backend finance readers fail closed during that mismatch.
 Rebuild/restart the backend after a new deployment so it imports the new manifest.
+
+
+## Sessions, CSRF and media (Phase 8.4–8.6)
+
+- **Session:** `cinevest_session` is a signed HS256 JWT (`SESSION_SECRET`, 8 h, issuer/audience pinned) in an
+  `HttpOnly; SameSite=Strict; Path=/api` cookie, `Secure` whenever `APP_URL` is HTTPS. It is stateless: logout
+  clears the cookie, and the short lifetime bounds a leaked token. Protected routes call `authenticate(request)`.
+- **CSRF / allowed host:** every state-changing route requires `Origin` to equal the `APP_URL` origin (the web
+  app proxies `/api`, preserving `Origin`) and rejects cross-site `Sec-Fetch-Site`; a missing or foreign origin fails
+  closed with `403`. The SIWE `domain`/`uri` must also match `APP_URL`.
+- **Wallet policy (EIP-1271):** only EOA signatures are accepted. Smart-contract wallet signatures are
+  unsupported and fail closed with `401`.
+- **Upload flow:** the session wallet must equal the Arc campaign creator. The attempt row is saved, then the
+  server calls Livepeer (key never reaches the browser; asset requested with a non-public `jwt` playback
+  policy), saves the provider asset ID, then returns the direct-upload URL. The browser uploads straight to
+  Livepeer, so video bytes never touch Next.js. Retrying with the same `attemptKey` returns the same attempt and
+  URLs while it is `uploading`; URLs are cleared once it leaves that state. Declared type
+  (`mp4`, `quicktime`, `webm`, `x-matroska`) and size (2 GiB) are validated up front; Livepeer's reported size is
+  re-checked at reconciliation. Up to 10 attempts per creator and campaign. A lost provider response leaves a
+  `pending` row that is retried; an orphaned provider asset is never selected.
+- **Status machine:** `pending → uploading → processing → ready`, any non-terminal state → `failed`; `ready` and
+  `failed` are terminal. Transitions are compare-and-set SQL updates, so duplicate pollers or an API timeout
+  cannot regress or double-ready an upload. Provider errors keep the stored status and return `stale: true`.
+- **Release selection:** one `campaign_media_release` row per `(arcChainId, campaignAddress)`; the upload must be
+  re-confirmed `ready` by Livepeer at selection time. `playbackIdHash = keccak256(UTF8(playbackId))`
+  (Solidity `keccak256(bytes(id))`); vectors: `"abc"` → `0x4e03657a…2d6c45`,
+  `"f5eed5c0wjwdj3nv"` → `0x2ba21022…5bc682`. The selection locks when Arc shows the campaign released/cancelled
+  or all tranches approved (the point the contract rejects `configureRelease`); a locked selection cannot be
+  changed. The release hash and Arc's stored hash are compared by `GET /api/media/release` (`matchesArc`).
+  These are trusted offchain checks, not onchain proof.

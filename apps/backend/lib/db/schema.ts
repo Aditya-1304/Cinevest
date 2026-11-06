@@ -29,6 +29,9 @@ export const mediaUploads = pgTable(
     attemptKey: text("attempt_key").notNull(),
     providerAssetId: text("provider_asset_id"),
     playbackId: text("playback_id"),
+    // Provider upload capabilities, held only while status is "uploading" so an interrupted browser can resume.
+    uploadUrl: text("upload_url"),
+    tusEndpoint: text("tus_endpoint"),
     status: text("status").notNull(),
     ownerWallet: text("owner_wallet").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
