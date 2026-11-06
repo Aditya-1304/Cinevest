@@ -1,5 +1,7 @@
 # World ID: P9.0a–P9.3
 
+Current integration and live acceptance status: [Phase 9 handoff](phase-9-completion.md).
+
 P9.4–P9.7a follow-up: see [verification implementation and evidence](phase-9-verification.md).
 
 ## Integration and scope evidence

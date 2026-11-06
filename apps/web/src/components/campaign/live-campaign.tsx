@@ -50,7 +50,7 @@ export function LiveCampaign({ campaign }: { campaign: Address }) {
           <CardContent className="space-y-3 px-4 py-3">
             {!factory ? (
               <p role="status">
-                The Arc Testnet factory deployment has not been configured yet.
+                The current contract deployment could not be verified. Funding stays unavailable until the matching revision is deployed.
               </p>
             ) : registry.data === false ? (
               <p role="alert">

@@ -42,6 +42,8 @@ export const serverEnvSchema = z.object({
   WORLD_RP_SIGNING_KEY: optionalText,
   WORLD_APP_ID: optionalText,
   WORLD_ACTION: optionalText,
+  WORLD_VERIFIER_PRIVATE_KEY: optionalText,
+  WORLD_AUTHORIZATION_ENVIRONMENT: optionalText,
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

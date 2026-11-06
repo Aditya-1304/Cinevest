@@ -1,8 +1,8 @@
 "use client";
 
 /** Per-campaign read hooks: factory registration, terms, stage, raised and per-wallet claimable receipts. */
-import { useAccount, useReadContract } from "wagmi";
-import { zeroAddress, type Address } from "viem";
+import { useAccount, useBytecode, useReadContract } from "wagmi";
+import { keccak256, zeroAddress, type Address } from "viem";
 import { campaignAbi, campaignFactoryAbi } from "@cinevest/abi";
 import { ARC_TESTNET, ARC_TESTNET_DEPLOYMENT } from "@/lib/chain";
 
@@ -11,7 +11,10 @@ const REFRESH = { refetchInterval: 15_000 } as const;
 export function useCampaign(campaign: Address) {
   const { address, chainId } = useAccount();
   const factoryAddress = ARC_TESTNET_DEPLOYMENT.factoryAddress;
-  const factory = !!factoryAddress;
+  const bytecode = useBytecode({ address: factoryAddress, chainId: ARC_TESTNET.id,
+    query: { enabled: ARC_TESTNET_DEPLOYMENT.compatible, ...REFRESH } });
+  const factory = ARC_TESTNET_DEPLOYMENT.compatible && Boolean(bytecode.data
+    && keccak256(bytecode.data) === ARC_TESTNET_DEPLOYMENT.runtimeCodeHash);
 
   const registry = useReadContract({
     address: factoryAddress,

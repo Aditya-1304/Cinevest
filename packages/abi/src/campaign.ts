@@ -74,6 +74,11 @@ export const campaignAbi = [
             "internalType": "uint256"
           }
         ]
+      },
+      {
+        "name": "verifierSigner",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"
@@ -100,6 +105,19 @@ export const campaignAbi = [
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "WORLD_AUTHORIZATION_TYPEHASH",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -244,6 +262,56 @@ export const campaignAbi = [
   },
   {
     "type": "function",
+    "name": "contributeWithAuthorization",
+    "inputs": [
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "authorization",
+        "type": "tuple",
+        "internalType": "struct CampaignTypes.WorldAuthorization",
+        "components": [
+          {
+            "name": "wallet",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "campaign",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scopedNullifierHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "nonce",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "signature",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "contribution",
     "inputs": [
       {
@@ -339,6 +407,49 @@ export const campaignAbi = [
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "eip712Domain",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "fields",
+        "type": "bytes1",
+        "internalType": "bytes1"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "version",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "verifyingContract",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "salt",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "extensions",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
       }
     ],
     "stateMutability": "view"
@@ -567,6 +678,25 @@ export const campaignAbi = [
   },
   {
     "type": "function",
+    "name": "humanContribution",
+    "inputs": [
+      {
+        "name": "nullifierHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "principal",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "isEvidenceRejected",
     "inputs": [
       {
@@ -606,6 +736,25 @@ export const campaignAbi = [
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "nullifierOwner",
+    "inputs": [
+      {
+        "name": "nullifierHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "wallet",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -770,6 +919,25 @@ export const campaignAbi = [
   },
   {
     "type": "function",
+    "name": "usedWorldAuthorizations",
+    "inputs": [
+      {
+        "name": "digest",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "consumed",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "withdrawableTrancheAmount",
     "inputs": [],
     "outputs": [
@@ -777,6 +945,65 @@ export const campaignAbi = [
         "name": "amount",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "worldAuthorizationDigest",
+    "inputs": [
+      {
+        "name": "authorization",
+        "type": "tuple",
+        "internalType": "struct CampaignTypes.WorldAuthorization",
+        "components": [
+          {
+            "name": "wallet",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "campaign",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "scopedNullifierHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "nonce",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "worldVerifierSigner",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -848,6 +1075,12 @@ export const campaignAbi = [
         "internalType": "bool"
       }
     ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EIP712DomainChanged",
+    "inputs": [],
     "anonymous": false
   },
   {
@@ -1226,6 +1459,16 @@ export const campaignAbi = [
   },
   {
     "type": "error",
+    "name": "InvalidShortString",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidWorldAuthorization",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "MilestoneNotOpen",
     "inputs": [
       {
@@ -1248,6 +1491,16 @@ export const campaignAbi = [
   {
     "type": "error",
     "name": "NothingToRefund",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PerHumanLimitExceeded",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PerHumanLimitRequired",
     "inputs": []
   },
   {
@@ -1339,6 +1592,17 @@ export const campaignAbi = [
   },
   {
     "type": "error",
+    "name": "StringTooLong",
+    "inputs": [
+      {
+        "name": "str",
+        "type": "string",
+        "internalType": "string"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "TokenUnsupported",
     "inputs": []
   },
@@ -1371,7 +1635,32 @@ export const campaignAbi = [
   },
   {
     "type": "error",
-    "name": "WorldGateUnenforced",
+    "name": "WorldAuthorizationExpired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WorldAuthorizationRequired",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WorldAuthorizationUsed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WorldGateNotEnabled",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WorldNullifierOwned",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WorldVerifierRequired",
     "inputs": []
   },
   {

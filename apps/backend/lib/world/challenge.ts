@@ -44,9 +44,7 @@ export const worldUint256 = z.string().refine((value) =>
 
 /** Context validation precedes the official verifier; it never establishes proof validity by itself. */
 export async function validateWorldContext(wallet: string, token: string, proof: unknown) {
-  const { payload } = await jwtVerify(token, key(), { ...jwtScope, algorithms: ["HS256"] });
-  const context = claims.parse(payload);
-  if (context.wallet !== wallet) throw new Error("Wallet does not match challenge");
+  const context = await readWorldContext(wallet, token);
   const response = z.object({
     session_id: z.never().optional(),
     protocol_version: z.literal("4.0"), nonce: z.literal(context.nonce),
@@ -60,4 +58,12 @@ export async function validateWorldContext(wallet: string, token: string, proof:
     }).passthrough()).length(1),
   }).passthrough().parse(proof);
   return { context, response };
+}
+
+/** Also used by token-only permission recovery; proof verification remains a separate boundary. */
+export async function readWorldContext(wallet: string, token: string) {
+  const { payload } = await jwtVerify(token, key(), { ...jwtScope, algorithms: ["HS256"] });
+  const context = claims.parse(payload);
+  if (context.wallet !== wallet) throw new Error("Wallet does not match challenge");
+  return context;
 }

@@ -64,6 +64,13 @@
       "when": 1794009604000,
       "tag": "0008_world_verification",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794009605000,
+      "tag": "0009_world_authorizations",
+      "breakpoints": true
     }
   ]
 }

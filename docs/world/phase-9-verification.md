@@ -1,5 +1,7 @@
 # P9.4–P9.7a implementation and evidence
 
+Later issuance, UI and ABI work is recorded in [the Phase 9 handoff](phase-9-completion.md).
+
 ## Behavior
 
 `POST /api/world/challenge` now stores a five-minute challenge before returning
