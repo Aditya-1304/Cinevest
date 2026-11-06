@@ -1,32 +1,32 @@
 import "server-only";
-import { createPrivateKey, createPublicKey } from "node:crypto";
+import { createPrivateKey } from "node:crypto";
 import { SignJWT } from "jose";
 import { requireServerEnv } from "@/lib/env";
 
-/** Bearer token lifetime; clients renew before expiry. Bounded so a leaked or shared token stops working quickly. */
-export const PLAYBACK_TOKEN_TTL_SECONDS = 300;
-
-const pem = (value: string) => (value.includes("BEGIN") ? value : Buffer.from(value, "base64").toString("utf8"));
+const MIN_TTL_SECONDS = 15 * 60;
+const MAX_TTL_SECONDS = 6 * 60 * 60;
 
 /**
- * Signs a Livepeer access JWT in the format of the official @livepeer/core signAccessJwt: ES256,
- * claims action/iss/pub/sub/video/exp/iat, bound to one playback ID. The signing key pair must match,
- * so a misconfigured or half-rotated key fails closed here instead of minting tokens Livepeer rejects.
- *
- * Rotation: register the new public key in Livepeer Studio, switch both env values, then delete the
- * old key only after PLAYBACK_TOKEN_TTL_SECONDS has elapsed so in-flight tokens finish validating.
+ * Mux embeds the token in the HLS child-playlist and segment URLs, so it must outlive the whole film
+ * rather than be renewed mid-playback. Lifetime is the film length plus a margin, bounded above.
  */
-export async function signPlaybackToken(playbackId: string, ttlSeconds = PLAYBACK_TOKEN_TTL_SECONDS) {
-  const privateKey = createPrivateKey(pem(requireServerEnv("LIVEPEER_SIGNING_KEY")));
-  const publicValue = requireServerEnv("LIVEPEER_SIGNING_PUBLIC_KEY");
-  const expected = createPublicKey(privateKey).export({ type: "spki", format: "der" });
-  if (!createPublicKey(pem(publicValue)).export({ type: "spki", format: "der" }).equals(expected)) {
-    throw new Error("Livepeer signing key pair mismatch");
-  }
-  const iat = Math.floor(Date.now() / 1000);
-  const exp = iat + ttlSeconds;
-  const token = await new SignJWT({ action: "pull", iss: new URL(requireServerEnv("APP_URL")).origin,
-    pub: publicValue.includes("BEGIN") ? Buffer.from(publicValue).toString("base64") : publicValue, sub: playbackId, video: "none" })
-    .setProtectedHeader({ alg: "ES256", typ: "JWT" }).setIssuedAt(iat).setExpirationTime(exp).sign(privateKey);
-  return { token, expiresAt: new Date(exp * 1000).toISOString(), refreshAt: new Date((exp - 60) * 1000).toISOString() };
+export function playbackTtlSeconds(durationSeconds: number | null) {
+  return Math.min(MAX_TTL_SECONDS, Math.max(MIN_TTL_SECONDS, (durationSeconds ?? 2 * 60 * 60) + MIN_TTL_SECONDS));
+}
+
+/**
+ * Signs a Mux signed-playback JWT: RS256, `sub` = playback ID, `aud` = "v" (video), `kid` = signing key.
+ * Mux validates it at the CDN per request, so it is scoped to one asset and fails once expired.
+ *
+ * Rotation: create a new Mux signing key, switch MUX_SIGNING_KEY_ID and MUX_SIGNING_PRIVATE_KEY, and delete the
+ * old key only after the longest outstanding token (MAX_TTL_SECONDS) has expired.
+ */
+export async function signPlaybackToken(playbackId: string, ttlSeconds: number) {
+  const kid = requireServerEnv("MUX_SIGNING_KEY_ID");
+  const pem = requireServerEnv("MUX_SIGNING_PRIVATE_KEY");
+  const privateKey = createPrivateKey(pem.includes("BEGIN") ? pem : Buffer.from(pem, "base64").toString("utf8"));
+  const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+  const token = await new SignJWT({ kid }).setProtectedHeader({ alg: "RS256", typ: "JWT", kid })
+    .setSubject(playbackId).setAudience("v").setExpirationTime(exp).sign(privateKey);
+  return { token, expiresAt: new Date(exp * 1000).toISOString() };
 }

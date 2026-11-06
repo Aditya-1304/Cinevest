@@ -28,9 +28,11 @@ export const mediaUploads = pgTable(
     arcChainId: text("arc_chain_id").notNull().default("5042002"),
     campaignAddress: text("campaign_address").notNull(),
     attemptKey: text("attempt_key").notNull(),
+    providerUploadId: text("provider_upload_id"),
     providerAssetId: text("provider_asset_id"),
+    durationSeconds: integer("duration_seconds"),
     playbackId: text("playback_id"),
-    // Provider upload capabilities, held only while status is "uploading" so an interrupted browser can resume.
+    // Provider upload URL, held only while status is "uploading" so an interrupted browser can resume.
     uploadUrl: text("upload_url"),
     tusEndpoint: text("tus_endpoint"),
     // Latest provider policy and delivery-layer probe result: trusted offchain evidence, never secrets.
@@ -47,6 +49,7 @@ export const mediaUploads = pgTable(
     uniqueIndex("media_uploads_attempt_unique").on(table.attemptKey),
     index("media_uploads_campaign_idx").on(table.arcChainId, table.campaignAddress),
     index("media_uploads_provider_asset_idx").on(table.providerAssetId),
+    index("media_uploads_provider_upload_idx").on(table.providerUploadId),
   ],
 );
 

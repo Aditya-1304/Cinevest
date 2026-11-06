@@ -2,7 +2,7 @@ import "server-only";
 import { and, count, eq, isNull } from "drizzle-orm";
 import { createDatabase } from "@/lib/db";
 import { mediaUploads } from "@/lib/db/schema";
-import { requestUpload } from "./livepeer";
+import { createUpload } from "./mux";
 
 const MAX_ATTEMPTS_PER_CAMPAIGN = 10;
 
@@ -16,7 +16,7 @@ export class UploadError extends Error {
 
 /**
  * Starts or resumes one upload attempt. The attempt row is persisted before the provider is called
- * and the provider asset ID is persisted before the direct-upload URL is returned, so a lost
+ * and the provider upload ID is persisted before the direct-upload URL is returned, so a lost
  * response or interrupted browser re-enters here with the same attemptKey instead of duplicating work.
  */
 export async function startUpload(input: Identity): Promise<Upload> {
@@ -33,12 +33,11 @@ export async function startUpload(input: Identity): Promise<Upload> {
   if (!row || row.ownerWallet !== input.ownerWallet || row.campaignAddress !== input.campaignAddress || row.arcChainId !== input.arcChainId) {
     throw new UploadError(409, "Upload attempt key is already in use");
   }
-  if (row.status !== "pending" || row.providerAssetId) return row; // resume: uploading rows still hold their URLs
-  const upload = await requestUpload(`cinevest-${row.id}`);
-  // CAS on providerAssetId: a concurrent request for the same attempt wins once; the loser's orphan asset is never selected.
+  if (row.status !== "pending" || row.providerUploadId) return row; // resume: uploading rows still hold their URL
+  const upload = await createUpload(row.id);
+  // CAS on providerUploadId: a concurrent request for the same attempt wins once; the loser's orphan upload is never used.
   const [saved] = await db.update(mediaUploads).set({
-    providerAssetId: upload.assetId, playbackId: upload.playbackId, uploadUrl: upload.url, tusEndpoint: upload.tusEndpoint,
-    status: "uploading", updatedAt: new Date(),
-  }).where(and(eq(mediaUploads.id, row.id), isNull(mediaUploads.providerAssetId), eq(mediaUploads.status, "pending"))).returning();
+    providerUploadId: upload.uploadId, uploadUrl: upload.url, status: "uploading", updatedAt: new Date(),
+  }).where(and(eq(mediaUploads.id, row.id), isNull(mediaUploads.providerUploadId), eq(mediaUploads.status, "pending"))).returning();
   return saved ?? (await find()) ?? row;
 }

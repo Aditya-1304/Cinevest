@@ -35,7 +35,7 @@ export async function selectRelease(arcChainId: string, campaignAddress: string,
   return row ?? null;
 }
 
-/** Records the provider policy and delivery probe outcome for an upload (tokens and URLs are never stored). */
-export async function recordProbe(uploadId: string, policyType: string, probe: ProbeResult) {
-  await createDatabase().update(mediaUploads).set({ policyType, probeResult: probe, probedAt: new Date() }).where(eq(mediaUploads.id, uploadId));
+/** Records the provider policy, confirmed signed playback ID and delivery probe outcome (tokens and URLs are never stored). */
+export async function recordProbe(uploadId: string, policyType: string, probe: ProbeResult, playbackId: string) {
+  await createDatabase().update(mediaUploads).set({ policyType, playbackId, probeResult: probe, probedAt: new Date() }).where(eq(mediaUploads.id, uploadId));
 }

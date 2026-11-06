@@ -6,7 +6,7 @@ import { mediaUploads } from "@/lib/db/schema";
 import { reconcileUpload } from "@/lib/media/reconcile";
 import { uploadView } from "@/lib/media/view";
 
-/** Owner-only status poll: reconciles with Livepeer each call and reports the real processing state. */
+/** Owner-only status poll: reconciles with Mux each call and reports the real processing state. */
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const session = await authenticate(request);
   if (session instanceof NextResponse) return session;

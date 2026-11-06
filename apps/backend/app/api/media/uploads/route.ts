@@ -16,7 +16,7 @@ const schema = z.object({
 }).strict();
 
 /**
- * Creator-only: starts or resumes a direct-to-Livepeer upload attempt. Retrying with the same
+ * Creator-only: starts or resumes a direct-to-Mux upload attempt. Retrying with the same
  * attemptKey returns the same attempt, so the browser can recover without re-uploading through Next.js.
  */
 export async function POST(request: Request) {

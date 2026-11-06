@@ -51,7 +51,7 @@ export default async function WatchPage({
           </p>
           <p>
             Sign in with the wallet that purchased access on Arc Testnet. The player
-            receives a short-lived token that is renewed automatically while you watch.
+            receives an asset-scoped token for this film.
           </p>
           <p className="mt-4 !text-xs">
             Purchasing access is not available on this page yet; wallets without

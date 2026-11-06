@@ -21,11 +21,10 @@ registerHooks({ resolve(specifier, context, next) {
   return next(specifier === "next/server" ? "next/server.js" : specifier, context);
 } });
 
-const ec = () => generateKeyPairSync("ec", { namedCurve: "prime256v1", publicKeyEncoding: { type: "spki", format: "pem" }, privateKeyEncoding: { type: "pkcs8", format: "pem" } });
-const keys = ec();
+const keys = generateKeyPairSync("rsa", { modulusLength: 2048, publicKeyEncoding: { type: "spki", format: "pem" }, privateKeyEncoding: { type: "pkcs8", format: "pem" } });
 Object.assign(process.env, {
-  APP_URL: "http://localhost:3000", SESSION_SECRET: "s".repeat(40), LIVEPEER_API_KEY: "test-key",
-  LIVEPEER_SIGNING_KEY: Buffer.from(keys.privateKey).toString("base64"), LIVEPEER_SIGNING_PUBLIC_KEY: Buffer.from(keys.publicKey).toString("base64"),
+  APP_URL: "http://localhost:3000", SESSION_SECRET: "s".repeat(40), MUX_TOKEN_ID: "id", MUX_TOKEN_SECRET: "secret",
+  MUX_SIGNING_KEY_ID: "kid-1", MUX_SIGNING_PRIVATE_KEY: Buffer.from(keys.privateKey).toString("base64"),
 });
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const schema = await import("@/lib/db/schema");
@@ -72,7 +71,7 @@ const post = (handler, body, { cookie, origin = ORIGIN } = {}) => handler(new Re
   headers: { "content-type": "application/json", ...(origin ? { origin } : {}), ...(cookie ? { cookie } : {}) },
 }));
 async function seedRelease({ playbackId = PB, status = "ready" } = {}) {
-  const [row] = await db.insert(schema.mediaUploads).values({ arcChainId: CHAIN, campaignAddress: campaign, attemptKey: `seed-${++n}`, providerAssetId: `asset-${n}`, playbackId, status, ownerWallet: owner }).returning();
+  const [row] = await db.insert(schema.mediaUploads).values({ arcChainId: CHAIN, campaignAddress: campaign, attemptKey: `seed-${++n}`, providerUploadId: `up-${n}`, providerAssetId: `asset-${n}`, playbackId, durationSeconds: 7200, status, ownerWallet: owner }).returning();
   await db.delete(schema.campaignMediaRelease);
   await db.insert(schema.campaignMediaRelease).values({ arcChainId: CHAIN, campaignAddress: campaign, mediaUploadId: row.id, playbackIdHash: playbackIdHash(playbackId) });
   return row;
@@ -85,8 +84,10 @@ test("I18: playback credentials are issued only for a valid SIWE session wallet 
   const ok = await post(authorize, body, { cookie });
   assert.equal(ok.status, 200);
   const grant = await ok.json();
-  const { payload } = await jwtVerify(grant.token, await importSPKI(keys.publicKey, "ES256"), { algorithms: ["ES256"] });
+  const { payload } = await jwtVerify(grant.token, await importSPKI(keys.publicKey, "RS256"), { algorithms: ["RS256"], audience: "v" });
   assert.equal(payload.sub, PB); // token is scoped to exactly the selected asset
+  assert.equal(payload.kid, "kid-1");
+  assert.ok(payload.exp - Math.floor(Date.now() / 1000) >= 120 * 60 + 14 * 60, "token outlives the film (Mux embeds it in segment URLs)");
   assert.equal(grant.playbackId, PB);
 
   assert.equal((await post(authorize, body)).status, 401, "guest");
@@ -154,7 +155,7 @@ function provider(handlers) {
   };
 }
 const json = (value, status = 200) => new Response(JSON.stringify(value), { status });
-const asset = (phase, extra = {}) => ({ id: "asset-x", playbackId: PB, status: { phase }, playbackPolicy: { type: "jwt" }, ...extra });
+const muxAsset = (status, extra = {}) => json({ data: { id: "asset-x", status, duration: 120, playback_ids: [{ id: PB, policy: "signed" }], ...extra } });
 
 test("Arc RPC outage fails every authorization route closed", async () => {
   const cookie = await cookieFor(owner);
@@ -170,47 +171,50 @@ test("Arc RPC outage fails every authorization route closed", async () => {
 test("lost upload response and slow provider leave one recoverable attempt", async () => {
   const attemptKey = crypto.randomUUID();
   const input = { arcChainId: CHAIN, campaignAddress: campaign, ownerWallet: owner, attemptKey };
-  provider([["/api/asset/request-upload", () => { throw new Error("response lost"); }]]);
+  provider([["/video/v1/uploads", () => { throw new Error("response lost"); }]]);
   await assert.rejects(startUpload(input));
   const [pending] = await db.select().from(schema.mediaUploads).where(eq(schema.mediaUploads.attemptKey, attemptKey));
-  assert.equal(pending.status, "pending"); // attempt persisted before the provider call, no asset yet
-  provider([["/api/asset/request-upload", () => json({ url: "https://upload.livepeer.studio/put", tusEndpoint: "https://tus.livepeer.studio/x", asset: asset("waiting", { id: "asset-77" }) })]]);
+  assert.equal(pending.status, "pending"); // attempt persisted before the provider call, no provider upload yet
+  provider([["/video/v1/uploads", () => json({ data: { id: "up-77", url: "https://storage.example/upload", status: "waiting" } }, 201)]]);
   const [a, b] = await Promise.all([startUpload(input), startUpload(input)]);
   assert.equal(a.id, pending.id); assert.equal(b.id, pending.id);
   assert.equal((await db.select().from(schema.mediaUploads).where(eq(schema.mediaUploads.attemptKey, attemptKey))).length, 1);
-  const again = await startUpload(input); // browser interruption: same attempt, same URLs
-  assert.equal(again.status, "uploading"); assert.equal(again.uploadUrl, "https://upload.livepeer.studio/put");
+  const again = await startUpload(input); // browser interruption: same attempt, same URL
+  assert.equal(again.status, "uploading"); assert.equal(again.uploadUrl, "https://storage.example/upload"); assert.equal(again.providerUploadId, "up-77");
   await assert.rejects(startUpload({ ...input, ownerWallet: stranger }), /already in use/);
 
-  provider([["/api/asset/", () => new Promise((_, reject) => setTimeout(() => reject(new DOMException("timeout", "TimeoutError")), 5))]]);
+  provider([["/video/v1/uploads/", () => json({ data: { id: "up-77", status: "waiting" } })]]);
+  assert.equal((await reconcileUpload(again)).row.status, "uploading"); // still waiting for the file
+  provider([["/video/v1/uploads/", () => new Promise((_, reject) => setTimeout(() => reject(new DOMException("timeout", "TimeoutError")), 5))]]);
   const slow = await reconcileUpload(again);
   assert.equal(slow.stale, true); assert.equal(slow.row.status, "uploading"); // timeout never regresses or fails the attempt
-  provider([["/api/asset/", () => json(asset("ready", { size: 5 * 1024 ** 3 }))]]);
-  assert.equal((await reconcileUpload(again)).row.status, "failed"); // oversized upload is rejected at reconciliation
+  provider([["/video/v1/uploads/", () => json({ data: { id: "up-77", status: "asset_created", asset_id: "asset-77" } })], ["/video/v1/assets/", () => muxAsset("ready", { duration: 5 * 3600 })]]);
+  const long = await reconcileUpload(again);
+  assert.equal(long.row.status, "failed"); assert.equal(long.row.providerAssetId, "asset-77"); // overlong asset is rejected at reconciliation
 });
 
 test("duplicate provider callbacks converge on a single ready state", async () => {
-  const [row] = await db.insert(schema.mediaUploads).values({ arcChainId: CHAIN, campaignAddress: campaign, attemptKey: crypto.randomUUID(), providerAssetId: "asset-dup", status: "uploading", ownerWallet: owner }).returning();
-  provider([["/api/asset/", () => json(asset("ready"))]]);
+  const [row] = await db.insert(schema.mediaUploads).values({ arcChainId: CHAIN, campaignAddress: campaign, attemptKey: crypto.randomUUID(), providerUploadId: "up-dup", providerAssetId: "asset-dup", status: "uploading", ownerWallet: owner }).returning();
+  provider([["/video/v1/assets/", () => muxAsset("ready")]]);
   const results = await Promise.all(Array.from({ length: 6 }, () => reconcileUpload(row)));
-  assert.ok(results.every((r) => r.row.status === "ready" && r.row.playbackId === PB));
-  provider([["/api/asset/", () => json(asset("failed"))]]); // a late conflicting callback cannot undo ready
+  assert.ok(results.every((r) => r.row.status === "ready" && r.row.playbackId === PB && r.row.durationSeconds === 120));
+  provider([["/video/v1/assets/", () => muxAsset("errored")]]); // a late conflicting callback cannot undo ready
   assert.equal((await reconcileUpload({ ...row, status: "uploading" })).row.status, "ready");
 });
 
 test("provider asset deletion or policy reset is caught by the final-review gate", async () => {
   await seedRelease();
   const onchain = arcState.hash;
-  provider([["/api/asset/", () => json(asset("deleted"))]]);
+  provider([["/video/v1/assets/", () => new Response("{}", { status: 404 })]]); // asset deleted
   assert.equal((await verifyRelease(CHAIN, campaign, onchain)).ok, false);
-  provider([["/api/asset/", () => json(asset("ready", { playbackPolicy: null }))]]); // policy reset to public
+  provider([["/video/v1/assets/", () => muxAsset("ready", { playback_ids: [{ id: PB, policy: "signed" }, { id: "publicId0123456789", policy: "public" }] })]]); // public playback ID added
   const reset = await verifyRelease(CHAIN, campaign, onchain);
   assert.equal(reset.ok, false); assert.equal(reset.checks.nonpublicPolicy, false);
-  provider([["/api/asset/", () => json(asset("ready", { playbackId: "swappedPlayback01" }))]]); // playback ID changed under us
+  provider([["/video/v1/assets/", () => muxAsset("ready", { playback_ids: [{ id: "swappedPlayback01", policy: "signed" }] })]]); // playback ID changed under us
   assert.equal((await verifyRelease(CHAIN, campaign, onchain)).ok, false);
-  provider([["/api/asset/", () => json(asset("ready"))]]);
+  provider([["/video/v1/assets/", () => muxAsset("ready")]]);
   assert.equal((await verifyRelease(CHAIN, campaign, `0x${"00".repeat(32)}`)).checks.hashMatchesArc, false); // Arc commitment differs
-  provider([["/api/asset/", () => { throw new Error("provider down"); }]]);
+  provider([["/video/v1/assets/", () => { throw new Error("provider down"); }]]);
   await assert.rejects(verifyRelease(CHAIN, campaign, onchain)); // unavailable provider is an error, never a pass
 });
 

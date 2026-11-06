@@ -3,7 +3,7 @@
 The governing requirements are `Cinevest_TECH_SPEC_AND_BUILD_PLAN_UPDATED.md`.
 This service owns public discovery, artifact validation, publication recovery, and
 listing renewal. Arc is the authority for financial state. The server never holds
-an Arc transaction-signing key. SIWE, Livepeer playback authorization, and World
+an Arc transaction-signing key. SIWE, Mux playback authorization, and World
 attestations belong to Phases 8–9. World-gated contributions remain fail-closed.
 
 ## Run and verify
@@ -67,12 +67,12 @@ No files under `apps/web` were changed by this backend work.
 | `POST /api/auth/verify` | Verifies an EOA SIWE signature, returns its address and chain ID, and starts the cookie session |
 | `GET /api/auth/session` | Protected: returns the signed-in wallet, `401` for guests |
 | `POST /api/auth/logout` | Clears the session cookie |
-| `POST /api/media/uploads` | Creator session: starts or resumes (same `attemptKey`) a direct-to-Livepeer upload; returns the upload URLs |
-| `GET /api/media/uploads/:id` | Owner session: reconciles with Livepeer and reports the real status (`pending/uploading/processing/ready/failed`) |
+| `POST /api/media/uploads` | Creator session: starts or resumes (same `attemptKey`) a direct-to-Mux upload; returns the upload URL |
+| `GET /api/media/uploads/:id` | Owner session: reconciles with Mux and reports the real status (`pending/uploading/processing/ready/failed`) |
 | `GET /api/media/release?arcChainId=&campaignAddress=` | Public: selected release hash, lock state, and whether it equals Arc `livepeerPlaybackIdHash` |
-| `POST /api/media/release` | Creator session: enforces the JWT policy, runs the delivery probe, then selects exactly one provider-ready upload and returns the hash for `configureRelease` (`409` with probe checks if protection fails) |
-| `GET /api/media/release/verify?arcChainId=&campaignAddress=` | Creator/reviewer session: live final-review gate (provider ready, JWT policy, hash = DB = Arc, delivery probe) |
-| `POST /api/playback/authorize` | Session wallet that Arc says paid for a released film gets `{playbackId, token, expiresAt, refreshAt}` |
+| `POST /api/media/release` | Creator session: enforces the signed-only policy, runs the delivery probe, then selects exactly one provider-ready upload and returns the hash for `configureRelease` (`409` with probe checks if protection fails) |
+| `GET /api/media/release/verify?arcChainId=&campaignAddress=` | Creator/reviewer session: live final-review gate (provider ready, signed-only policy, hash = DB = Arc, delivery probe) |
+| `POST /api/playback/authorize` | Session wallet that Arc says paid for a released film gets `{playbackId, token, expiresAt}` |
 | `POST /api/arkiv-rpc` | Bounded allowlist relay for creator-signed Rabdi transactions; no server signing |
 
 All signed requests use `publicationMessage(payloadWithoutSignature)` from
@@ -90,7 +90,7 @@ matching JPEG/PNG/WebP/GIF header. For a pitch it is the versioned input from
 `lib/swarm/pitch.ts`: `title`, `synopsis`, `posterRef`, `genre`, `creator`, and
 `rightsNotice`. Milestones use the input in `lib/swarm/milestone.ts` and require
 the Arc creator in Production. All content is explicitly public; private films
-belong to the Phase 8 Livepeer upload path.
+belong to the Phase 8 Mux upload path.
 
 The sole new-write identities are `Cinevest.pitch.v1`, `Cinevest.milestone.v1`, and
 `Cinevest.film.v1`. Old `clipstake.*` schemas are not silently rewritten or treated
@@ -159,7 +159,7 @@ commitment. Campaigns have a fixed seven-day grace period after their production
 deadline, after which anyone can cancel unfinished production and recover unspent
 principal pro rata. Released films remain protected from cancellation. Generic
 `ClaimPaid` events remain, with typed `PayoutPaid` events for indexing. Playback
-hashes commit identifiers; they are not evidence that Livepeer is available.
+hashes commit identifiers; they are not evidence that the video host is available. (The contract field is still named `livepeerPlaybackIdHash`; it holds the hash of the Mux playback ID.)
 
 Run `npm run contracts:deploy:arc` and sign the tested factory creation from the
 specified wallet. The signing page verifies sender, creation bytecode, runtime,
@@ -179,63 +179,67 @@ Rebuild/restart the backend after a new deployment so it imports the new manifes
   closed with `403`. The SIWE `domain`/`uri` must also match `APP_URL`.
 - **Wallet policy (EIP-1271):** only EOA signatures are accepted. Smart-contract wallet signatures are
   unsupported and fail closed with `401`.
+- **Provider:** Mux (Livepeer Studio closed new sign-ups). Env: `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET` (API access) and
+  `MUX_SIGNING_KEY_ID`, `MUX_SIGNING_PRIVATE_KEY` (base64 PEM from `POST /system/v1/signing-keys`).
 - **Upload flow:** the session wallet must equal the Arc campaign creator. The attempt row is saved, then the
-  server calls Livepeer (key never reaches the browser; asset requested with a non-public `jwt` playback
-  policy), saves the provider asset ID, then returns the direct-upload URL. The browser uploads straight to
-  Livepeer, so video bytes never touch Next.js. Retrying with the same `attemptKey` returns the same attempt and
-  URLs while it is `uploading`; URLs are cleared once it leaves that state. Declared type
-  (`mp4`, `quicktime`, `webm`, `x-matroska`) and size (2 GiB) are validated up front; Livepeer's reported size is
-  re-checked at reconciliation. Up to 10 attempts per creator and campaign. A lost provider response leaves a
-  `pending` row that is retried; an orphaned provider asset is never selected.
+  server creates a Mux direct upload (credentials never reach the browser; signed-only playback policy), saves the
+  provider upload ID, and returns the upload URL. The browser `PUT`s straight to Mux, so video bytes never touch
+  Next.js. Retrying with the same `attemptKey` returns the same attempt and URL while it is `uploading`; the URL is
+  cleared once it leaves that state. Declared type (`mp4`, `quicktime`, `webm`, `x-matroska`) and size (2 GiB) are
+  validated up front. Mux reports no file size, so reconciliation enforces a 4 h duration cap instead. Up to 10
+  attempts per creator and campaign. A lost provider response leaves a `pending` row that is retried; an orphaned
+  provider upload is never used. Mux creates the asset only when the file arrives, so reconciliation checks the
+  upload first and records the asset ID once it appears.
 - **Status machine:** `pending → uploading → processing → ready`, any non-terminal state → `failed`; `ready` and
   `failed` are terminal. Transitions are compare-and-set SQL updates, so duplicate pollers or an API timeout
-  cannot regress or double-ready an upload. Provider errors keep the stored status and return `stale: true`.
+  cannot regress or double-ready an upload. Provider errors keep the stored status and return `stale: true`; a
+  deleted asset fails the attempt.
 - **Release selection:** one `campaign_media_release` row per `(arcChainId, campaignAddress)`; the upload must be
-  re-confirmed `ready` by Livepeer at selection time. `playbackIdHash = keccak256(UTF8(playbackId))`
+  re-confirmed `ready` by Mux at selection time. `playbackIdHash = keccak256(UTF8(playbackId))`
   (Solidity `keccak256(bytes(id))`); vectors: `"abc"` → `0x4e03657a…2d6c45`,
   `"f5eed5c0wjwdj3nv"` → `0x2ba21022…5bc682`. The selection locks when Arc shows the campaign released/cancelled
   or all tranches approved (the point the contract rejects `configureRelease`); a locked selection cannot be
   changed. The release hash and Arc's stored hash are compared by `GET /api/media/release` (`matchesArc`).
   These are trusted offchain checks, not onchain proof.
 
-
 ## Protected playback (Phase 8.7–8.9)
 
-- **Policy:** assets are created with, and re-confirmed to have, a `jwt` playback policy (`ensureJwtPolicy`
-  PATCHes then re-reads; it throws unless Livepeer reports `jwt`).
-- **Delivery probe (`lib/media/probe.ts`):** as an anonymous client it fetches the HLS manifest and first
-  segment (must be `401/403`), then with a valid token (must be `200`), and the manifest with an expired,
-  wrong-asset and bad-signature token (must all be `401/403`). Provider-supplied URLs must be HTTPS on a Livepeer host
-  allowlist. Only status codes and the policy are stored on `media_uploads` (`policy_type`, `probe_result`,
-  `probed_at`); tokens and URLs are never stored or logged. Selection and `/release/verify` both run it, so a
-  stale, wrong or unready asset is blocked and the reason is logged (`media.release.verify_failed`). The UI must
-  call `/release/verify` before enabling final approval; these results are trusted offchain evidence, not onchain proof.
+- **Policy:** assets are created `signed`-only. `ensureSignedPolicy` removes any public playback ID, adds a signed
+  one if missing, then re-reads and throws unless the asset is signed-only. The signed playback ID is what the release hash commits to.
+- **Delivery probe (`lib/media/probe.ts`):** as an anonymous client it fetches `stream.mux.com/{id}.m3u8` and the
+  first segment (must be `401/403`), then with a valid token (must be `200`), and the manifest with an expired,
+  wrong-asset and bad-signature token (must all be `401/403`). Anonymous requests strip any `token` that Mux embeds
+  in manifest child URLs. Provider URLs must be HTTPS on `*.mux.com`. Only status codes and the policy are stored
+  on `media_uploads` (`policy_type`, `probe_result`, `probed_at`); tokens and URLs are never stored or logged.
+  Selection and `/release/verify` both run it, so a stale, wrong or unready asset is blocked and the reason is logged
+  (`media.release.verify_failed`). The UI must call `/release/verify` before enabling final approval; these results are
+  trusted offchain evidence, not onchain proof.
 - **Authorization:** the wallet comes only from the session and the asset only from the release row. Access is
   denied unless the campaign is Arc `Released`, `hasPaidAccess(wallet)` is true, and the stored selection, recomputed
   hash and Arc `livepeerPlaybackIdHash` are identical. Arc RPC or database failure returns `503` (fail closed).
-- **Token:** ES256 JWT in the `@livepeer/core` `signAccessJwt` format (`action=pull`, `iss`, `pub`, `sub=playbackId`,
-  `video`, `iat`, `exp`), 300 s lifetime, signed with `LIVEPEER_SIGNING_KEY` (base64 PKCS8 PEM from Studio) and
-  `LIVEPEER_SIGNING_PUBLIC_KEY` (base64, as Studio returns it). A mismatched pair refuses to sign. Pass it to the
-  player or as `Livepeer-Jwt`/`?jwt=`. **Renewal:** call authorize again before `refreshAt`; a new token overlaps the
-  old one, so playback is not interrupted. **Disclosure:** a token is a bearer credential and can be shared until it expires.
-- **Key rotation:** create the new key in Studio, set both env values and deploy, then delete the old Studio key
-  only after 300 s so in-flight tokens still validate.
-- **Verification status:** the token format was checked against the official SDK's output and the probe logic against a
-  fake provider that verifies tokens. No real Livepeer asset has been probed yet (no API key in this checkout), so
-  Livepeer's actual playback-info shape and JWT delivery behavior still need one live run.
+- **Token:** RS256 JWT (`sub` = playback ID, `aud` = `v`, `kid` = signing key ID, `exp`), passed to Mux as
+  `?token=` (the Mux player does this). **Lifetime:** Mux embeds the token in child-playlist and segment URLs, so it
+  must outlive the film: film length + 15 min, between 15 min and 6 h, so there is no mid-play renewal. A viewer
+  whose token lapsed (long pause, reload) asks authorize again. **Disclosure:** a token is a bearer credential and
+  can be shared until it expires, i.e. up to the film length plus margin.
+- **Key rotation:** create a new Mux signing key, set both env values and deploy, then delete the old key only after
+  the longest outstanding token (6 h) has expired.
+- **Verification status:** the token and probe logic were checked against a fake Mux that verifies tokens and embeds
+  them in segment URLs. No real Mux asset has been probed yet, so the actual denial status codes (assumed `401/403`)
+  and player behavior need one live run.
 
 ## Player and negative tests (Phase 8.10–8.11)
 
-- **Player:** `apps/web` renders `ProtectedPlayer` on `/watch/:chainId/:campaign` (`@livepeer/react`). It runs
-  wallet connect, SIWE sign-in (`useSession`), `POST /api/playback/authorize`, then plays with the returned `jwt`.
+- **Player:** `apps/web` renders `ProtectedPlayer` on `/watch/:chainId/:campaign` (`@mux/mux-player-react`). It runs
+  wallet connect, SIWE sign-in (`useSession`), `POST /api/playback/authorize`, then plays with the returned token.
   Explicit states: sign-in required, authorizing, denied (not purchased / not released), unavailable with Retry, and
-  an in-player interruption Retry. The token is renewed before `refreshAt`; a failed renewal retries every 15 s while
-  the current token is valid. Purchasing access is not on this page (that is a later phase).
+  an interruption Retry that requests a fresh token. Purchasing access is not on this page (that is a later phase).
 - **Tests:** `lib/media/playback.test.mjs` drives the real route handlers against an in-memory PostgreSQL with only
-  Arc RPC and Livepeer faked. It covers guest, forged/tampered session, foreign origin, wrong chain/campaign,
+  Arc RPC and Mux faked. It covers guest, forged/tampered session, foreign origin, wrong chain/campaign,
   another wallet, client-supplied hash/wallet, unpublished film, DB/Arc hash mismatch, SIWE replay/foreign
   domain/wrong chain/stale message (`I18`), and the failure matrix: Arc outage fails every route closed, a lost upload
-  response resumes the same attempt, a provider timeout never regresses status, oversized assets fail, duplicate
-  callbacks converge on one `ready`, and asset deletion, policy reset or a changed playback ID fails the final-review gate.
-- **Not covered offline:** real Livepeer delivery behavior and the browser player with a live token need one run with
-  `LIVEPEER_API_KEY` and a signing key; `probePlayback` is the tool for that run.
+  response resumes the same attempt, a provider timeout never regresses status, overlong assets fail, duplicate
+  callbacks converge on one `ready`, and asset deletion, a public playback ID or a changed playback ID fails the
+  final-review gate.
+- **Not covered offline:** real Mux delivery behavior and the browser player with a live token need one run with
+  Mux credentials and a signing key; `probePlayback` is the tool for that run.

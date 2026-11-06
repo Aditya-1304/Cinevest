@@ -1,22 +1,21 @@
 import "server-only";
-import { signPlaybackToken } from "./playback-token";
+import { playbackTtlSeconds, signPlaybackToken } from "./playback-token";
 
 /** Delivery hosts a probe may contact; manifest/segment URLs come from the provider and are never trusted blindly. */
-const HOSTS = ["livepeer.studio", "lp-playback.studio", "livepeercdn.studio", "livepeercdn.com", "livepeer.com"];
+const HOSTS = ["mux.com"];
 const allowed = (url: URL) => url.protocol === "https:" && HOSTS.some((host) => url.hostname === host || url.hostname.endsWith(`.${host}`));
 const denied = (status: number) => status === 401 || status === 403;
 const served = (status: number) => status === 200 || status === 206;
 
-async function fetchOnce(href: string, jwt?: string) {
+/** One GET with the token (if any) as Mux's `token` query parameter; anonymous requests never carry one. */
+async function fetchOnce(href: string, token?: string) {
   let url = new URL(href);
   for (let hop = 0; hop < 3; hop++) {
     if (!allowed(url)) throw new Error("Playback URL host is not allowed");
     const target = new URL(url);
-    if (jwt) target.searchParams.set("jwt", jwt);
-    const response = await fetch(target, {
-      headers: { ...(jwt ? { "Livepeer-Jwt": jwt } : {}), range: "bytes=0-262143" },
-      redirect: "manual", signal: AbortSignal.timeout(8000), cache: "no-store",
-    });
+    target.searchParams.delete("token");
+    if (token) target.searchParams.set("token", token);
+    const response = await fetch(target, { headers: { range: "bytes=0-262143" }, redirect: "manual", signal: AbortSignal.timeout(8000), cache: "no-store" });
     const location = response.headers.get("location");
     if (response.status >= 300 && response.status < 400 && location) { await response.body?.cancel(); url = new URL(location, url); continue; }
     // Only status and a bounded text prefix are needed; never buffer media bytes.
@@ -27,13 +26,12 @@ async function fetchOnce(href: string, jwt?: string) {
 }
 
 /** Resolves the first segment by walking master -> media playlist, bounded to two levels. */
-async function firstSegment(manifestUrl: URL, manifest: string, jwt: string) {
+async function firstSegment(manifestUrl: URL, manifest: string, token: string) {
   const first = (text: string) => text.split("\n").map((line) => line.trim()).find((line) => line && !line.startsWith("#"));
   if (manifest.includes("#EXT-X-STREAM-INF")) {
     const variant = first(manifest.slice(manifest.indexOf("#EXT-X-STREAM-INF")));
     if (!variant) return null;
-    const variantUrl = new URL(variant, manifestUrl);
-    const media = await fetchOnce(variantUrl.href, jwt);
+    const media = await fetchOnce(new URL(variant, manifestUrl).href, token);
     const segment = served(media.status) ? first(media.text) : null;
     return segment ? new URL(segment, media.url) : null;
   }
@@ -48,27 +46,18 @@ export type ProbeResult = { ok: boolean; reason?: string; checks: Record<string,
 /**
  * Probes the provider's delivery layer as an anonymous client and with signed tokens. Passing requires
  * anonymous manifest and segment access to be denied, a valid token to be served, and expired,
- * wrong-asset and badly signed tokens to be denied. This is trusted offchain evidence about Livepeer's
+ * wrong-asset and badly signed tokens to be denied. This is trusted offchain evidence about Mux's
  * current behavior, not an onchain proof.
  */
 export async function probePlayback(playbackId: string): Promise<ProbeResult> {
   const checks: ProbeResult["checks"] = {};
   const fail = (reason: string): ProbeResult => ({ ok: false, reason, checks });
   try {
-    const good = (await signPlaybackToken(playbackId)).token;
-    const infoUrl = `https://livepeer.studio/api/playback/${encodeURIComponent(playbackId)}`;
-    const anonInfo = await fetchOnce(infoUrl);
-    checks.infoAnonymous = anonInfo.status;
-    const info = served(anonInfo.status) ? anonInfo : await fetchOnce(infoUrl, good);
-    checks.infoSigned = info.status;
-    const sources = served(info.status) ? (JSON.parse(info.text)?.meta?.source ?? []) as { type?: string; url?: string }[] : [];
-    const hls = sources.find((source) => /mpegurl/i.test(source.type ?? "") || /\.m3u8/.test(source.url ?? ""))?.url;
-    if (!hls) return fail("HLS source unavailable from provider");
-    const manifestUrl = new URL(hls);
-
+    const manifestUrl = new URL(`https://stream.mux.com/${encodeURIComponent(playbackId)}.m3u8`);
     // Sign before starting any request so a rejection can never be left unobserved while awaiting.
+    const good = (await signPlaybackToken(playbackId, playbackTtlSeconds(null))).token;
     const expiredToken = (await signPlaybackToken(playbackId, -60)).token;
-    const wrongAssetToken = (await signPlaybackToken("0000000000000000")).token;
+    const wrongAssetToken = (await signPlaybackToken("0000000000000000", 600)).token;
     const [anon, signed, expired, wrong, tampered] = await Promise.all([
       fetchOnce(manifestUrl.href),
       fetchOnce(manifestUrl.href, good),

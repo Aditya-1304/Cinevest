@@ -15,13 +15,6 @@ const enteredFrom: Record<MediaStatus, MediaStatus[]> = {
 
 export const isTerminal = (status: string) => status === "ready" || status === "failed";
 
-export function phaseToStatus(phase: string): MediaStatus {
-  if (phase === "ready") return "ready";
-  if (phase === "processing") return "processing";
-  if (phase === "waiting") return "uploading";
-  return "failed"; // failed, deleting, deleted or any unknown provider phase fails closed
-}
-
 /**
  * Compare-and-set transition. Duplicate callbacks, concurrent pollers and stale reads lose the
  * race instead of regressing or conflicting; returns the updated row, or null if not applied.
@@ -30,7 +23,7 @@ export async function transition(
   db: ReturnType<typeof createDatabase>,
   id: string,
   to: MediaStatus,
-  patch: { playbackId?: string | null } = {},
+  patch: { playbackId?: string | null; durationSeconds?: number | null } = {},
 ) {
   const [row] = await db.update(mediaUploads)
     .set({ ...patch, status: to, updatedAt: new Date(), ...(to === "uploading" ? {} : { uploadUrl: null, tusEndpoint: null }) })

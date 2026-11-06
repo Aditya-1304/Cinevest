@@ -23,7 +23,7 @@ export function GET() {
         process.env.SWARM_BEE_URL?.trim() && process.env.SWARM_POSTAGE_BATCH_ID?.trim(),
       ),
       swarmGateway: Boolean(process.env.SWARM_GATEWAY_URL?.trim()),
-      livepeer: Boolean(process.env.LIVEPEER_API_KEY?.trim()),
+      mux: Boolean(process.env.MUX_TOKEN_ID?.trim() && process.env.MUX_TOKEN_SECRET?.trim()),
       world: Boolean(
         process.env.WORLD_RP_ID?.trim() && process.env.WORLD_RP_SIGNING_KEY?.trim(),
       ),

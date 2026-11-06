@@ -8,7 +8,7 @@ import { readJson } from "@/lib/http";
 import { readCampaignMedia } from "@/lib/media/arc";
 import { arcChainId, campaignAddress } from "@/lib/media/input";
 import { reconcileUpload } from "@/lib/media/reconcile";
-import { ensureJwtPolicy } from "@/lib/media/livepeer";
+import { ensureSignedPolicy } from "@/lib/media/mux";
 import { probePlayback } from "@/lib/media/probe";
 import { getRelease, lockRelease, recordProbe, selectRelease } from "@/lib/media/release";
 
@@ -57,12 +57,13 @@ export async function POST(request: Request) {
     const { row, stale } = await reconcileUpload(upload);
     if (stale) return NextResponse.json({ error: "Provider status unavailable", retryable: true }, { status: 503 });
     if (row.status !== "ready" || !row.playbackId) return NextResponse.json({ error: "Upload is not ready", status: row.status }, { status: 409 });
-    // Nonpublic policy and live delivery probe must both pass before the hash for configureRelease is handed out.
-    const policy = await ensureJwtPolicy(row.providerAssetId!);
-    const probe = await probePlayback(row.playbackId);
-    await recordProbe(row.id, policy, probe);
+    // Signed-only policy and live delivery probe must both pass before the hash for configureRelease is handed out.
+    if (!row.providerAssetId) return NextResponse.json({ error: "Upload is not ready", status: row.status }, { status: 409 });
+    const playbackId = await ensureSignedPolicy(row.providerAssetId);
+    const probe = await probePlayback(playbackId);
+    await recordProbe(row.id, "signed", probe, playbackId);
     if (!probe.ok) return NextResponse.json({ error: "Playback protection check failed", reason: probe.reason, checks: probe.checks }, { status: 409 });
-    const release = await selectRelease(input.arcChainId, input.campaignAddress, row.id, row.playbackId);
+    const release = await selectRelease(input.arcChainId, input.campaignAddress, row.id, playbackId);
     if (!release) return NextResponse.json({ error: "Release selection is locked" }, { status: 409 });
     return NextResponse.json({ uploadId: row.id, playbackIdHash: release.playbackIdHash }, { headers });
   } catch { return NextResponse.json({ error: "Release selection unavailable", retryable: true }, { status: 503 }); }
