@@ -28,6 +28,22 @@ contract Campaign is ICampaignEvents, ReentrancyGuard, EIP712 {
     /// @notice Lifetime principal per human; refunds never reopen the funding cap.
     mapping(bytes32 nullifierHash => uint256 principal) public humanContribution;
 
+    /// @notice Optional initial human quota; zero preserves perpetual World gating.
+    uint256 public verifiedFirstRoundTarget;
+    uint256 public verifiedHumanCount;
+    address private immutable _deploymentFactory;
+    bool private _roundConfigured;
+    mapping(bytes32 approvalId => bool approved) public sponsorApprovals;
+    mapping(bytes32 approvalKey => bool consumed) public consumedSponsorApprovals;
+    event MilestoneApproved(uint8 indexed milestoneIndex, bytes32 evidenceReference);
+    event VerifiedFirstRoundConfigured(uint256 target);
+    event PublicFundingOpened(uint256 verifiedHumans);
+    event SponsorApproved(bytes32 indexed approvalId, address indexed sponsor, uint256 amount, bytes32 conditionsHash);
+    event SponsorDeposited(bytes32 indexed approvalId, address indexed sponsor, uint256 amount);
+    error InvalidExtensionConfiguration();
+    error SponsorApprovalRequired();
+    error IncorrectTokenReceipt();
+
     CampaignTypes.CampaignTerms private _terms;
     CampaignTypes.Stage private _stage;
 
@@ -67,6 +83,7 @@ contract Campaign is ICampaignEvents, ReentrancyGuard, EIP712 {
     {
         CampaignTypes.validateTerms(terms);
         if (terms.worldGated && verifierSigner == address(0)) revert CampaignTypes.WorldVerifierRequired();
+        _deploymentFactory = msg.sender;
         worldVerifierSigner = verifierSigner;
         _terms = terms;
         _stage = CampaignTypes.Stage.Funding;
@@ -74,7 +91,7 @@ contract Campaign is ICampaignEvents, ReentrancyGuard, EIP712 {
 
     /// @notice Permissionless funding is available only to campaigns that do not require World ID.
     function contribute(uint256 amount) external nonReentrant {
-        if (_terms.worldGated) revert CampaignTypes.WorldAuthorizationRequired();
+        if (_terms.worldGated && !publicFundingOpen()) revert CampaignTypes.WorldAuthorizationRequired();
         _contribute(amount);
     }
 
@@ -104,8 +121,28 @@ contract Campaign is ICampaignEvents, ReentrancyGuard, EIP712 {
         usedWorldAuthorizations[digest] = true;
         nullifierOwner[nullifier] = msg.sender;
         humanContribution[nullifier] = funded + amount;
-        if (owner == address(0)) emit ProofVerified(nullifier, msg.sender);
+        if (owner == address(0)) {
+            verifiedHumanCount += 1;
+            emit ProofVerified(nullifier, msg.sender);
+            if (verifiedFirstRoundTarget != 0 && verifiedHumanCount == verifiedFirstRoundTarget) {
+                emit PublicFundingOpened(verifiedHumanCount);
+            }
+        }
         _contribute(amount);
+    }
+
+    /// @notice Factory-only creation configuration; cannot change once published in the registry.
+    function configureVerifiedFirstRound(uint256 target) external {
+        if (msg.sender != _deploymentFactory || _roundConfigured || !_terms.worldGated
+            || target == 0 || _raised != 0) revert InvalidExtensionConfiguration();
+        _roundConfigured = true;
+        verifiedFirstRoundTarget = target;
+        emit VerifiedFirstRoundConfigured(target);
+    }
+
+    /// @notice Public contributions unlock permanently after N distinct, successfully funded humans.
+    function publicFundingOpen() public view returns (bool) {
+        return !_terms.worldGated || (verifiedFirstRoundTarget != 0 && verifiedHumanCount >= verifiedFirstRoundTarget);
     }
 
     /// @notice Returns the exact EIP-712 digest used by the backend encoder and replay guard.
@@ -195,6 +232,7 @@ contract Campaign is ICampaignEvents, ReentrancyGuard, EIP712 {
             );
         }
         _approvedEvidence[index] = actualEvidenceHash;
+        emit MilestoneApproved(index, actualEvidenceHash);
         if (_approvedTrancheCount <= index) _approvedTrancheCount = index + 1;
     }
 
@@ -368,6 +406,40 @@ contract Campaign is ICampaignEvents, ReentrancyGuard, EIP712 {
         if (_stage != CampaignTypes.Stage.Released) revert CampaignTypes.ReleasedStageRequired();
         if (hasAccess[msg.sender]) revert CampaignTypes.AccessAlreadyPurchased();
         uint256 price = _terms.watchPrice;
+        hasAccess[msg.sender] = true;
+        SafeERC20.safeTransferFrom(IERC20(_terms.usdc), msg.sender, address(this), price);
+        _creditRevenue(price);
+        emit WatchPurchased(msg.sender, price);
+    }
+
+    /// @notice Independent reviewer approves an exact sponsor, amount and offchain conditions commitment.
+    /// @dev Approval IDs are single-use and can be revoked before a deposit; conditions must be reviewed offchain.
+    function approveSponsor(bytes32 approvalId, address sponsor, uint256 amount, bytes32 conditionsHash, bool approved) external {
+        if (msg.sender != _terms.reviewer) revert CampaignTypes.ReviewerOnly();
+        if (sponsor == address(0) || amount == 0 || conditionsHash == bytes32(0)) revert InvalidExtensionConfiguration();
+        bytes32 key = keccak256(abi.encode(approvalId, sponsor, amount, conditionsHash));
+        if (consumedSponsorApprovals[key]) revert SponsorApprovalRequired();
+        sponsorApprovals[key] = approved;
+        emit SponsorApproved(approvalId, sponsor, approved ? amount : 0, conditionsHash);
+    }
+
+    /// @notice Pulls real USDC before crediting the same capped waterfall used by paid viewing.
+    function depositSponsor(bytes32 approvalId, uint256 amount, bytes32 conditionsHash) external nonReentrant {
+        if (_stage != CampaignTypes.Stage.Released) revert CampaignTypes.ReleasedStageRequired();
+        bytes32 key = keccak256(abi.encode(approvalId, msg.sender, amount, conditionsHash));
+        if (!sponsorApprovals[key]) revert SponsorApprovalRequired();
+        sponsorApprovals[key] = false;
+        consumedSponsorApprovals[key] = true;
+        IERC20 token = IERC20(_terms.usdc);
+        uint256 beforeBalance = token.balanceOf(address(this));
+        SafeERC20.safeTransferFrom(token, msg.sender, address(this), amount);
+        if (token.balanceOf(address(this)) - beforeBalance != amount) revert IncorrectTokenReceipt();
+        _creditRevenue(amount);
+        emit SponsorDeposited(approvalId, msg.sender, amount);
+    }
+
+    /// @dev Both receipt sources share rounding, repayment-cap and rights-expiry accounting.
+    function _creditRevenue(uint256 price) private {
         uint256 cap = Math.mulDiv(_raised, _terms.repaymentCapBps, CampaignTypes.BPS);
         uint256 funderAmount;
         if (block.timestamp < releasedAt + _terms.rightsDuration && funderAllocated < cap) {
@@ -376,7 +448,6 @@ contract Campaign is ICampaignEvents, ReentrancyGuard, EIP712 {
             );
         }
         uint256 creatorAmount = price - funderAmount;
-        hasAccess[msg.sender] = true;
         funderAllocated += funderAmount;
         creatorAllocated += creatorAmount;
         if (funderAmount != 0) {
@@ -391,8 +462,6 @@ contract Campaign is ICampaignEvents, ReentrancyGuard, EIP712 {
             }
             accRewardPerUnit += increment;
         }
-        SafeERC20.safeTransferFrom(IERC20(_terms.usdc), msg.sender, address(this), price);
-        emit WatchPurchased(msg.sender, price);
         emit RevenueCredited(funderAmount, creatorAmount);
     }
 

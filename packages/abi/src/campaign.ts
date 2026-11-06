@@ -137,6 +137,39 @@ export const campaignAbi = [
   },
   {
     "type": "function",
+    "name": "approveSponsor",
+    "inputs": [
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "sponsor",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "conditionsHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "approved",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "approveStage",
     "inputs": [
       {
@@ -249,6 +282,38 @@ export const campaignAbi = [
   },
   {
     "type": "function",
+    "name": "configureVerifiedFirstRound",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "consumedSponsorApprovals",
+    "inputs": [
+      {
+        "name": "approvalKey",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "consumed",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "contribute",
     "inputs": [
       {
@@ -354,6 +419,29 @@ export const campaignAbi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "depositSponsor",
+    "inputs": [
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "conditionsHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -774,6 +862,19 @@ export const campaignAbi = [
   },
   {
     "type": "function",
+    "name": "publicFundingOpen",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "publishFilm",
     "inputs": [],
     "outputs": [],
@@ -869,6 +970,25 @@ export const campaignAbi = [
   },
   {
     "type": "function",
+    "name": "sponsorApprovals",
+    "inputs": [
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "approved",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "submitEvidence",
     "inputs": [
       {
@@ -932,6 +1052,32 @@ export const campaignAbi = [
         "name": "consumed",
         "type": "bool",
         "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "verifiedFirstRoundTarget",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "verifiedHumanCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -1123,6 +1269,25 @@ export const campaignAbi = [
   },
   {
     "type": "event",
+    "name": "MilestoneApproved",
+    "inputs": [
+      {
+        "name": "milestoneIndex",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "uint8"
+      },
+      {
+        "name": "evidenceReference",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "PayoutPaid",
     "inputs": [
       {
@@ -1180,6 +1345,19 @@ export const campaignAbi = [
   },
   {
     "type": "event",
+    "name": "PublicFundingOpened",
+    "inputs": [
+      {
+        "name": "verifiedHumans",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "ReleaseConfigured",
     "inputs": [
       {
@@ -1203,6 +1381,62 @@ export const campaignAbi = [
       },
       {
         "name": "creatorAmount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SponsorApproved",
+    "inputs": [
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "sponsor",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "conditionsHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SponsorDeposited",
+    "inputs": [
+      {
+        "name": "approvalId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "sponsor",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -1244,6 +1478,19 @@ export const campaignAbi = [
         "type": "bytes32",
         "indexed": false,
         "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "VerifiedFirstRoundConfigured",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -1459,6 +1706,16 @@ export const campaignAbi = [
   },
   {
     "type": "error",
+    "name": "IncorrectTokenReceipt",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidExtensionConfiguration",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidShortString",
     "inputs": []
   },
@@ -1589,6 +1846,11 @@ export const campaignAbi = [
         "internalType": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "SponsorApprovalRequired",
+    "inputs": []
   },
   {
     "type": "error",

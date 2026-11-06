@@ -57,8 +57,8 @@ export function validateFilmCandidate(row: unknown, approvedChainId: number): Ca
     return { valid: false, reason: "arkiv_owner_mismatch" };
   }
   if (
-    typeof entity.title?.value !== "string" || entity.title.value.trim().length === 0 || Buffer.byteLength(entity.title.value, "utf8") > 128 ||
-    typeof entity.genre?.value !== "string" || entity.genre.value.trim().length === 0 || Buffer.byteLength(entity.genre.value, "utf8") > 128 ||
+    typeof entity.title?.value !== "string" || entity.title.value.trim().length === 0 || new TextEncoder().encode(entity.title.value).byteLength > 128 ||
+    typeof entity.genre?.value !== "string" || entity.genre.value.trim().length === 0 || new TextEncoder().encode(entity.genre.value).byteLength > 128 ||
     typeof entity.fundingDeadline?.value !== "bigint" ||
     !normalizeSwarmReference(entity.pitchSwarmRef?.value) ||
     !normalizeSwarmReference(entity.posterSwarmRef?.value) ||

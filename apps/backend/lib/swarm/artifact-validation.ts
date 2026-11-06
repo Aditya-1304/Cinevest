@@ -7,7 +7,7 @@ export const SAFE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image
 
 const safeImageTypes = new Set<string>(SAFE_IMAGE_TYPES);
 /** Shared write/read schema: every uploaded pitch is readable without a legacy field conversion. */
-const indexedText = z.string().trim().min(1).refine(value => Buffer.byteLength(value, "utf8") <= 128);
+const indexedText = z.string().trim().min(1).refine(value => new TextEncoder().encode(value).byteLength <= 128);
 export const pitchInputSchema = z.object({
   title: indexedText,
   synopsis: z.string().trim().min(1).max(16_384),
@@ -83,11 +83,12 @@ export function normalizeImageContentType(value: string | null) {
 
 /** Bee serves raw /bytes data as octet-stream, so identify allowed images from their magic bytes. */
 export function sniffImageContentType(bytes: Uint8Array) {
-  const header = Buffer.from(bytes.slice(0, 12));
-  if (header.subarray(0, 8).toString("hex") === "89504e470d0a1a0a") return "image/png";
+  const header = bytes.slice(0, 12);
+  const ascii = new TextDecoder("ascii").decode(header);
+  if (Array.from(header.slice(0, 8), value => value.toString(16).padStart(2, "0")).join("") === "89504e470d0a1a0a") return "image/png";
   if (header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) return "image/jpeg";
-  if (/^GIF8[79]a/.test(header.toString("ascii"))) return "image/gif";
-  if (header.toString("ascii", 0, 4) === "RIFF" && header.toString("ascii", 8, 12) === "WEBP") return "image/webp";
+  if (/^GIF8[79]a/.test(ascii)) return "image/gif";
+  if (ascii.slice(0, 4) === "RIFF" && ascii.slice(8, 12) === "WEBP") return "image/webp";
   return null;
 }
 

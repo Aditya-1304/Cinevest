@@ -15,7 +15,7 @@ import { ARC_TESTNET } from "@/lib/chain";
 import { campaignTermsDigest, type CampaignTerms } from "@cinevest/abi";
 
 // Must stay identical to apps/backend/lib/arkiv/film-schema.ts.
-const filmSchema = defineSchema("Cinevest.film.v1", {
+export const filmSchema = defineSchema("Cinevest.film.v1", {
   arcChainId: u64(),
   campaignAddress: addr().indexed(),
   creatorAddress: addr().indexed(),
