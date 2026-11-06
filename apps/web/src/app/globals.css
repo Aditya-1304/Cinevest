@@ -5,6 +5,8 @@
 
 @theme inline {
   --font-sans: "Montserrat Variable", sans-serif;
+  --font-inter: var(--font-Inter);
+  --font-dela: var(--font-Dela);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);

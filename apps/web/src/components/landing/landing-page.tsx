@@ -1,22 +1,46 @@
-import { LandingAbout } from "./landing-about";
-import { LandingEconomy } from "./landing-economy";
-import { LandingFooter } from "./landing-footer";
-import { LandingHeader } from "./landing-header";
-import { LandingHero } from "./landing-hero";
-import { InfrastructureGrid } from "./infrastructure-grid";
+import { Dela_Gothic_One, Inter } from "next/font/google";
+import ReactLenis from "lenis/react";
 
+import About from "./sections/About";
+import CtaSection from "./sections/CtaSection";
+import Economy from "./sections/Economy";
+import Feature from "./sections/Feature";
+import Footer from "./sections/Footer";
+import Header from "./sections/Header";
+import Hero from "./sections/Hero";
+import StepsSection from "./sections/StepsSection";
+
+const inter = Inter({
+  variable: "--font-Inter",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const delaGothic = Dela_Gothic_One({
+  variable: "--font-Dela",
+  subsets: ["latin"],
+  weight: ["400"],
+});
+
+// Landing-only shell: fonts, smooth scroll and the grid backdrop stay scoped to "/".
 export function LandingPage() {
   return (
-    <main
-      id="top"
-      className="overflow-x-hidden bg-background text-foreground [--landing-gutter:max(6%,calc((100%-1440px)/2))] [&_a:focus-visible]:outline-3 [&_a:focus-visible]:outline-offset-4 [&_a:focus-visible]:outline-ring [&_button:focus-visible]:outline-3 [&_button:focus-visible]:outline-offset-4 [&_button:focus-visible]:outline-ring"
-    >
-      <LandingHeader />
-      <LandingHero />
-      <LandingAbout />
-      <InfrastructureGrid />
-      <LandingEconomy />
-      <LandingFooter />
-    </main>
+    <div className={`${inter.variable} ${delaGothic.variable} relative isolate bg-[#01060f]`}>
+      <ReactLenis root>
+        <Header />
+        <main className="relative">
+          <div className="pointer-events-none absolute inset-0 -z-10 bg-white/5 bg-[linear-gradient(to_right,#d9d9d980_1px,transparent_1px),linear-gradient(to_bottom,#d9d9d980_1px,transparent_1px)] bg-size-[122px_122px]" />
+          <div className="relative z-10">
+            <Hero />
+            <About />
+            <Feature />
+            <Economy />
+            <StepsSection />
+            <CtaSection />
+            <Footer />
+          </div>
+        </main>
+      </ReactLenis>
+    </div>
   );
 }
