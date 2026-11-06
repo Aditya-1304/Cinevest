@@ -128,7 +128,7 @@ Use the Arc explorer's write tab or a viem script. `cast` is not installed in th
 | Token header/claims (`RS256`, `kid` in header and claims, `aud` = `v`, `sub` = playback ID) are accepted by Mux. | `lib/media/playback-token.ts` |
 | `MuxPlayer` accepts `tokens={{ playback }}` and `onError` fires on playback failure. | `apps/web/src/components/playback/protected-player.tsx` |
 | `Origin` / `Sec-Fetch-Site` survive the Next `/api` rewrite (also `Set-Cookie` coming back). | `lib/auth/origin.ts` |
-| Mux manifests embed the token in child URLs; the probe strips `token` for anonymous requests. | `fetchOnce()` in `lib/media/probe.ts` |
+| Child playlist and segment URLs in a signed Mux manifest are pre-signed by Mux (cdn, expires, skid, signature); the probe requests them as given and strips the whole query for the anonymous check. | `fetchOnce()` in `lib/media/probe.ts` |
 
 ## 8. Known limits
 

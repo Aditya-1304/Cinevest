@@ -12,6 +12,8 @@ import { FilmStory } from "./film-story";
 import { CampaignBoundary } from "./campaign-boundary";
 import { CampaignActions } from "./campaign-actions";
 import { MilestonePanel } from "./milestone-panel";
+import { ReleasePanel } from "./release-panel";
+import { BuyAccess } from "./buy-access";
 import { stagePillClass } from "@/lib/stage-style";
 
 export function LiveCampaign({ campaign }: { campaign: Address }) {
@@ -196,6 +198,16 @@ export function LiveCampaign({ campaign }: { campaign: Address }) {
                 stage={stage.data}
               />
               <MilestonePanel
+                campaign={campaign}
+                terms={terms.data}
+                stage={stage.data}
+              />
+              <ReleasePanel
+                campaign={campaign}
+                terms={terms.data}
+                stage={stage.data}
+              />
+              <BuyAccess
                 campaign={campaign}
                 terms={terms.data}
                 stage={stage.data}

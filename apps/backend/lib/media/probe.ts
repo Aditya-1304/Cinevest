@@ -25,13 +25,33 @@ async function fetchOnce(href: string, token?: string) {
   throw new Error("Too many playback redirects");
 }
 
+/**
+ * Child playlist and segment URLs returned by a signed Mux manifest are pre-signed by Mux itself
+ * (query parameters such as `signature`, `skid`, `expires`), so they are requested exactly as given
+ * and are never given our playback token. An anonymous request is the same URL without its query.
+ */
+async function fetchChild(href: string, anonymous = false) {
+  let url = new URL(href);
+  for (let hop = 0; hop < 3; hop++) {
+    if (!allowed(url)) throw new Error("Playback URL host is not allowed");
+    const target = new URL(url);
+    if (anonymous) target.search = "";
+    const response = await fetch(target, { headers: { range: "bytes=0-262143" }, redirect: "manual", signal: AbortSignal.timeout(8000), cache: "no-store" });
+    const location = response.headers.get("location");
+    if (response.status >= 300 && response.status < 400 && location) { await response.body?.cancel(); url = new URL(location, url); continue; }
+    const text = served(response.status) ? (await response.text()).slice(0, 262144) : (await response.body?.cancel(), "");
+    return { status: response.status, text, url };
+  }
+  throw new Error("Too many playback redirects");
+}
+
 /** Resolves the first segment by walking master -> media playlist, bounded to two levels. */
-async function firstSegment(manifestUrl: URL, manifest: string, token: string) {
+async function firstSegment(manifestUrl: URL, manifest: string) {
   const first = (text: string) => text.split("\n").map((line) => line.trim()).find((line) => line && !line.startsWith("#"));
   if (manifest.includes("#EXT-X-STREAM-INF")) {
     const variant = first(manifest.slice(manifest.indexOf("#EXT-X-STREAM-INF")));
     if (!variant) return null;
-    const media = await fetchOnce(new URL(variant, manifestUrl).href, token);
+    const media = await fetchChild(new URL(variant, manifestUrl).href);
     const segment = served(media.status) ? first(media.text) : null;
     return segment ? new URL(segment, media.url) : null;
   }
@@ -70,9 +90,9 @@ export async function probePlayback(playbackId: string): Promise<ProbeResult> {
     if (!served(signed.status) || !signed.text.startsWith("#EXTM3U")) return fail("Signed manifest playback is not allowed");
     if (![expired, wrong, tampered].every((result) => denied(result.status))) return fail("Expired, wrong-asset or invalid-signature token was not denied");
 
-    const segment = await firstSegment(manifestUrl, signed.text, good);
+    const segment = await firstSegment(manifestUrl, signed.text);
     if (!segment) return fail("Media segment could not be located");
-    const [segmentAnon, segmentSigned] = await Promise.all([fetchOnce(segment.href), fetchOnce(segment.href, good)]);
+    const [segmentAnon, segmentSigned] = await Promise.all([fetchChild(segment.href, true), fetchChild(segment.href)]);
     Object.assign(checks, { segmentAnonymous: segmentAnon.status, segmentSigned: segmentSigned.status });
     if (!denied(segmentAnon.status)) return fail("Anonymous segment access is not denied");
     if (!served(segmentSigned.status)) return fail("Signed segment playback is not allowed");

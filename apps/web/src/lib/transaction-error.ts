@@ -30,6 +30,7 @@ const CONTRACT_ERROR_MESSAGES: Record<string, string> = {
   NothingToClaim: "There is nothing claimable for this wallet right now.",
   PitchReferenceRequired: "A Swarm pitch reference is required before this campaign can be created.",
   PlaybackReferenceRequired: "Final approval needs a configured film release first.",
+  FinalApprovalRequired: "All three milestones must be approved by the reviewer before the film can be published.",
   ProductionStageRequired: "This action unlocks only during the Production stage.",
   RefundStageRequired: "Refunds unlock only in a refundable or cancelled stage.",
   ReviewerIndependent: "The reviewer must use a different wallet from the creator.",

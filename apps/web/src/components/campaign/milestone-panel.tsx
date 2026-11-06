@@ -19,6 +19,7 @@ import { ARC_TESTNET, type CampaignTerms } from "@/lib/chain";
 import { campaignAbi } from "@cinevest/abi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ReleaseGateStatus, useReleaseGate } from "@/components/campaign/release-gate";
 import { TxStatus } from "@/components/ui/tx-status";
 import { useTxFlow } from "@/lib/use-tx-flow";
 import { signedPost } from "@/lib/publication-client";
@@ -180,6 +181,12 @@ export function MilestonePanel({
     dispute !== undefined;
   const creator = address?.toLowerCase() === terms.creator.toLowerCase();
   const reviewer = address?.toLowerCase() === terms.reviewer.toLowerCase();
+  // Release gate (trusted off-chain evidence) runs for the reviewer on final delivery only.
+  const gate = useReleaseGate(
+    campaign,
+    reviewer && stage === 2 && index === 2 && !finalBlockedMessage,
+  );
+  const [releaseBlock, setReleaseBlock] = useState<string>();
 
   /** Uploads each image, then the signed milestone manifest; the result becomes the evidence reference. */
   async function uploadEvidence() {
@@ -236,6 +243,18 @@ export function MilestonePanel({
     if (chainId !== ARC_TESTNET.id) {
       switchChain.switchChain({ chainId: ARC_TESTNET.id });
       return;
+    }
+    // Final delivery must pass the release gate again right before the approval is sent.
+    if (action === "approveStage" && index === 2) {
+      setReleaseBlock(undefined);
+      const outcome = await gate.recheck(true);
+      if (outcome.status !== "passed") {
+        setReleaseBlock(
+          outcome.reason ??
+            "The film release did not pass the final-delivery checks, so the approval was not sent.",
+        );
+        return;
+      }
     }
     setToastOpen(false);
     let submitted = false;
@@ -445,6 +464,9 @@ export function MilestonePanel({
           {reviewer && finalBlockedMessage && (
             <p className="text-xs text-amber-300">{finalBlockedMessage}</p>
           )}
+          {reviewer && stage === 2 && index === 2 && !finalBlockedMessage && (
+            <ReleaseGateStatus gate={gate} />
+          )}
           <div className="flex flex-wrap gap-3">
             {reviewer && (
               <>
@@ -454,7 +476,8 @@ export function MilestonePanel({
                     !evidence ||
                     evidence === zeroHash ||
                     dispute === 1 ||
-                    !!finalBlockedMessage
+                    !!finalBlockedMessage ||
+                    (index === 2 && gate.status !== "passed")
                   }
                   onClick={() => void act("approveStage")}
                 >
@@ -485,6 +508,11 @@ export function MilestonePanel({
               </Button>
             )}
           </div>
+          {index === 2 && releaseBlock && (
+            <p role="alert" className="text-xs text-red-300">
+              {releaseBlock}
+            </p>
+          )}
           <p className="text-xs text-muted-foreground">
             Milestone actions require Production stage, the authorized wallet
             and valid evidence. Final approval also requires a configured film
