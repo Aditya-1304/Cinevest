@@ -19,6 +19,9 @@ async function readSession() {
   }
 }
 
+/** Every useSession instance holds its own state, so a sign-in or sign-out is announced to the others. */
+const SESSION_CHANGED = "cinevest:session-changed";
+
 export function useSession() {
   const { address } = useAccount();
   const { signMessageAsync } = useSignMessage();
@@ -33,10 +36,12 @@ export function useSession() {
   }, []);
   useEffect(() => {
     let live = true;
-    void readSession().then((address) => {
+    const sync = () => void readSession().then((address) => {
       if (live) { setWallet(address); setChecked(true); }
     });
-    return () => { live = false; };
+    sync();
+    window.addEventListener(SESSION_CHANGED, sync);
+    return () => { live = false; window.removeEventListener(SESSION_CHANGED, sync); };
   }, []);
 
   const signIn = useCallback(async () => {
@@ -67,6 +72,7 @@ export function useSession() {
       });
       if (!verified.ok) throw new Error("Sign-in was rejected. Try again.");
       await refresh();
+      window.dispatchEvent(new Event(SESSION_CHANGED));
     } catch (cause) {
       setError(cause instanceof Error && cause.message.startsWith("Sign-in") ? cause.message : "Sign-in was cancelled or failed.");
     } finally {
@@ -77,6 +83,7 @@ export function useSession() {
   const signOut = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
     setWallet(null);
+    window.dispatchEvent(new Event(SESSION_CHANGED));
   }, []);
 
   return {

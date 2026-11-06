@@ -54,7 +54,7 @@ Arc Testnet (USDC) settles funding, milestones and access purchases in the Campa
 
 ## Sponsor integrations
 
-- **Arc:** factory `0x78f21797d0c8be56c41e10009e95d77f399581b0` (manifest: `contracts/deployments/arc-testnet.json`).
+- **Arc:** factory `0x72503029b6e59c2281f831c6dd8aa1788be5a9c7` (manifest: `contracts/deployments/arc-testnet.json`).
 - **Arkiv + Swarm:** see the `arkiv/` files.
 - **Chainlink CRE:** Arc + Mux release-readiness workflow; see `docs/cre.md`.
 

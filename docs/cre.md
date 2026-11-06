@@ -80,9 +80,12 @@ deployment blocker; this integration does not silently disable that protection.
    at that block. The HTTP capability calls Mux directly using CRE secrets.
 5. CRE checks registered identity, Production stage, previous milestone eligibility,
    unchanged/non-rejected evidence, absence of pending disputes, playback commitment,
-   Mux processing readiness and signed-only playback IDs. It also previews the
-   exact `approveStage(2, evidenceHash)` call with `eth_call` from the configured
-   reviewer. This does not submit a transaction or verify committee signatures.
+   Mux processing readiness and signed-only playback IDs. It also evaluates the
+   guards of `approveStage(2, evidenceHash)` from public state at that block,
+   including whether the current evidence is already approved. It cannot preview
+   the call as the reviewer, because the CLI v1.39 simulator ignores the `from`
+   field of EVM reads. It submits no transaction and does not verify committee
+   signatures.
 6. The runner accepts only one strictly validated, redacted report. The backend
    checks its nonce, bindings, expiry, proposed calldata and boolean outcome,
    rechecks the Arc block/evidence/commitment, and performs the existing live
@@ -126,13 +129,18 @@ their presence is not an active World sponsor submission.
 
 ## Verification status
 
-The workflow typechecks and compiles to WASM with the real CRE SDK and CLI.
-Application build/typecheck and focused lint are recorded separately from live
-acceptance. No test suites or test files were added/run for this integration.
+Verified on 2026-11-07 against live Arc Testnet and Mux, using CLI v1.39.0 on the
+current factory. This is a local simulation, not a deployed DON.
 
-Live acceptance requires CLI login, tenant Arc availability, a Mux read-only
-credential, a configured authenticated runner and a compatible campaign deployment.
-Until those are available, no successful end-to-end CRE simulation is claimed.
+- Backend to runner to `cre workflow simulate`: all nine checks passed, then the
+  live playback probe, in about 20 seconds per run.
+- Browser, as the reviewer: signing in ran the check, Approve stayed disabled until
+  it passed, and the click rechecked CRE before sending `approveStage(2, ...)`.
+- Refused as expected: no session, a stranger wallet, a wrong runner secret, a
+  different Mux asset, swapped evidence, an expired request, an old-factory
+  campaign, and a recheck after the final milestone was already approved.
+
+Fixtures are in `docs/fixtures.md`.
 
 The pinned CRE SDK brings an upstream Zod 3 dependency advisory reported by
 `npm audit`. Application/protocol validation uses patched Zod 4; runner inputs are

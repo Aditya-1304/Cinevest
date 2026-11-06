@@ -15,10 +15,22 @@ registerHooks({ resolve(specifier, context, nextResolve) {
   return nextResolve(specifier, context);
 } });
 config({ path: resolve(root, ".env.local"), quiet: true });
-const limit = Number(process.argv[2] ?? 50);
+const watch = process.argv.includes("--watch");
+const limit = Number(process.argv.slice(2).find(arg => arg !== "--watch") ?? 50);
 if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw new Error("Limit must be 1–500");
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
 const { settleViewing } = await import("../lib/viewing/service.ts");
-const result = await settleViewing(limit);
-console.log(JSON.stringify(result));
-if (result.failed) process.exitCode = 1;
+/** Well inside the 6-hour exit delay; --watch suits the long-running host that also runs the CRE runner. */
+const INTERVAL_MS = 5 * 60_000;
+do {
+  try {
+    const result = await settleViewing(limit);
+    console.log(JSON.stringify(result));
+    if (result.failed && !watch) process.exitCode = 1;
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    if (!watch) process.exitCode = 1;
+  }
+  if (watch) await new Promise(resolve => setTimeout(resolve, INTERVAL_MS));
+} while (watch);
+process.exit();

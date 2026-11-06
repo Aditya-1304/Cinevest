@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {fileURLToPath} from 'node:url';
 import {test} from 'node:test';
 import {registerHooks} from 'node:module';
 import {PGlite} from '@electric-sql/pglite';
@@ -20,7 +21,7 @@ const service=await import('./service.ts');
 const {GET: mediaRoute}=await import('../../app/api/viewing/media/[chainId]/[campaign]/[session]/[...path]/route.ts');
 const {setSessionCookie}=await import('@/lib/auth/session');
 const pg=new PGlite();const db=drizzle(pg,{schema});globalThis.__viewDb=db;
-await migrate(db,{migrationsFolder:new URL('../../drizzle',import.meta.url).pathname});
+await migrate(db,{migrationsFolder:fileURLToPath(new URL('../../drizzle',import.meta.url))});
 const campaign='0x'+'ab'.repeat(20),wallet='0x'+'cd'.repeat(20),pb='viewingTestPlayback';
 const key={arcChainId:'5042002',campaign,wallet};
 globalThis.__media={released:true,paid:false,onchainHash:playbackIdHash(pb),watchPrice:20_000_000n};

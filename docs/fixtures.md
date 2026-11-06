@@ -1,6 +1,26 @@
 # Testnet fixtures (Arc Testnet, chain 5042002)
 
-> These fixtures were created on the **previous** factory and are not compatible with the metered-viewing build. The current factory is in `contracts/deployments/arc-testnet.json`; new fixtures must be created on it.
+## Current factory (`0x72503029b6e59c2281f831c6dd8aa1788be5a9c7`)
+
+Deployed from the test creator wallet so the meter key is held here. Meter signer `0x56E6bDfa8C54f7BD8b89F759E101cD21fe86dAd0`.
+
+Metered film: `0x3aA1e7932dC4E738940f4a88f2fe0a4554B2B413`, 361 seconds, 73 blocks, watch price 1 USDC, CRE-approved then released.
+
+- Delivery stopped 60 seconds ahead of reported playback, and again when funds ran out; it resumed after a top-up.
+- Charges were exact: 12 blocks 164384, 18 blocks 246576.
+- A client that never reported received all 360 seconds and was charged only the 13 blocks past the free allowance: 178083.
+- The settlement worker posted 164384 on Arc once the lease expired, and `buyAccess` then took the remaining 835616.
+- Browser: 70 seconds played through the gateway, one sign-in unlocked the refund panel, and the refund button left the escrow at 0 with 191781 charged.
+- `requestViewingExit` set a 6-hour exit and blocked new sessions. The final `withdrawViewing` after that delay was not waited for here; `CampaignMeteredViewing.t.sol` covers it.
+- At the end, contract balance equalled `reservedUSDC`.
+
+## Previous factory (`0x78f21797d0c8be56c41e10009e95d77f399581b0`)
+
+- CRE plus full lifecycle: `0xD9c47CAd30e677eb3E6D39346816119801C6e26d`. Funded 2 USDC, all three tranches paid, released, one 1 USDC `buyAccess`, revenue claimed 0.8 to funders and 0.2 to the creator, final balance and reserved both 0. Final approval `0xa33c51cd81cdbff6e585d0aa1a6047d5c6fb747c1b123793d5f5f931dc218fee`, purchase `0xe3d80aee4830ef879fc28955ec02257a782b73cd59d93bc32f24b58d584ad498`.
+- Reviewer browser approval through the CRE gate: `0x49C72fc3E1c958c3ED14597e6C3673a92b4AeC3A`. Left at Production with all tranches approved.
+- Publication through `/create` (Swarm, Arc, Arkiv): `0x554Bbd8f013d6e7EDD9117Ff432d3AFd94285C18`, "Midnight Reel 81955".
+
+> The fixtures below were created on an older factory and are not compatible with the metered-viewing build.
 
 Factory (previous): `0x503ccf5a1d873d91e8581042aea002e02f027cd8` (deploy tx `0x5a95464aab0a0f8bbb7899fef7ff634fd73ae5699b2c2d0c100ae54bfbe45dcd`, block 71024966). Look transactions up in the Arc Testnet explorer.
 

@@ -43,8 +43,8 @@ function onReview(runtime: Runtime<Config>, payload: HTTPPayload): string {
   if (!network) throw new Error("Arc Testnet is unavailable in this SDK");
   const evm = new EVMClient(network.chainSelector.selector);
   const atBlock = blockNumber(BigInt(request.blockNumber));
-  const call = (address: Address, data: Hex, from: Address = zeroAddress) => bytesToHex(evm.callContract(runtime, {
-    call: encodeCallMsg({ from, to: address, data }), blockNumber: atBlock,
+  const call = (address: Address, data: Hex) => bytesToHex(evm.callContract(runtime, {
+    call: encodeCallMsg({ from: zeroAddress, to: address, data }), blockNumber: atBlock,
   }).result().data);
   const registered = decodeFunctionResult({
     abi: campaignFactoryAbi, functionName: "isCampaign",
@@ -52,12 +52,13 @@ function onReview(runtime: Runtime<Config>, payload: HTTPPayload): string {
   });
   if (!registered) throw new Error("Campaign is not registered");
   // Static campaign state is pinned to the same block selected by the authenticated backend.
-  const readData = (functionName: "getStage" | "getTerms" | "livepeerPlaybackIdHash" | "withdrawableTrancheAmount") =>
+  const readData = (functionName: "getStage" | "getTerms" | "livepeerPlaybackIdHash" | "withdrawableTrancheAmount" | "raised") =>
     call(request.campaign as Address, encodeFunctionData({ abi: campaignAbi, functionName }));
   const terms = decodeFunctionResult({ abi: campaignAbi, functionName: "getTerms", data: readData("getTerms") });
   const stage = decodeFunctionResult({ abi: campaignAbi, functionName: "getStage", data: readData("getStage") });
   const commitment = decodeFunctionResult({ abi: campaignAbi, functionName: "livepeerPlaybackIdHash", data: readData("livepeerPlaybackIdHash") });
   const eligible = decodeFunctionResult({ abi: campaignAbi, functionName: "withdrawableTrancheAmount", data: readData("withdrawableTrancheAmount") });
+  const raised = decodeFunctionResult({ abi: campaignAbi, functionName: "raised", data: readData("raised") });
   const evidence = decodeFunctionResult({ abi: campaignAbi, functionName: "evidenceReference",
     data: call(request.campaign as Address, encodeFunctionData({ abi: campaignAbi, functionName: "evidenceReference", args: [2n] })) });
   const disputes = [1n, 2n].map(index => decodeFunctionResult({ abi: campaignAbi, functionName: "disputeStatus",
@@ -69,15 +70,16 @@ function onReview(runtime: Runtime<Config>, payload: HTTPPayload): string {
     assetId, authorization, commitment: request.playbackCommitment,
   }).result();
   const approvalCalldata = encodeFunctionData({ abi: campaignAbi, functionName: "approveStage", args: [2, request.evidenceHash as Hex] });
-  let approvalAllowed = false;
-  // eth_call previews Campaign's exact guards from the configured reviewer; it never submits a transaction.
-  try { call(request.campaign as Address, approvalCalldata, terms.reviewer); approvalAllowed = true; }
-  catch { approvalAllowed = false; }
+  const production = stage === 2;
+  const evidenceMatches = evidence !== zeroHash && evidence.toLowerCase() === request.evidenceHash.toLowerCase() && !rejected;
+  const previousMilestoneApproved = eligible >= terms.fundingGoal * 70n / 100n;
+  const disputesClear = disputes.every(status => status !== 1);
+  // The simulator's EVM read ignores `from`, so approveStage cannot be previewed as the reviewer. These are its
+  // guards at the pinned block; eligible reaches raised only once the current final evidence is already approved.
+  const approvalAllowed = production && evidenceMatches && previousMilestoneApproved && disputesClear
+    && commitment !== zeroHash && eligible < raised;
   const checks = {
-    registered, approvalAllowed, production: stage === 2,
-    evidenceMatches: evidence !== zeroHash && evidence.toLowerCase() === request.evidenceHash.toLowerCase() && !rejected,
-    previousMilestoneApproved: eligible >= terms.fundingGoal * 70n / 100n,
-    disputesClear: disputes.every(status => status !== 1),
+    registered, approvalAllowed, production, evidenceMatches, previousMilestoneApproved, disputesClear,
     commitmentMatches: commitment !== zeroHash && commitment.toLowerCase() === request.playbackCommitment.toLowerCase() && mux.commitmentMatches,
     providerReady: mux.providerReady, signedOnly: mux.signedOnly,
   };

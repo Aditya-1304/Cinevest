@@ -52,6 +52,7 @@ export function MeteredPlayer({ campaign, sessionId, startSeconds, onEnd }: {
   useEffect(() => {
     const video = (player.current as unknown as { media?: { _hlsConfig: typeof HLS_CONFIG } } | null)?.media;
     if (video) video._hlsConfig = HLS_CONFIG;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the source must follow the mounted element's HLS config.
     setSrc(viewingManifest(campaign, sessionId));
   }, [campaign, sessionId]);
 
