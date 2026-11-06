@@ -169,6 +169,7 @@ export function ReleasePanel({
 
   useEffect(() => {
     if (!active) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadRelease fetches then sets state
     void loadRelease();
   }, [active, loadRelease]);
 

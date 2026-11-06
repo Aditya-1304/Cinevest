@@ -51,7 +51,7 @@ export function useSession() {
         `${window.location.host} wants you to sign in with your Ethereum account:`,
         getAddress(address),
         "",
-        "Sign in to Cinevest to watch films you have purchased.",
+        "Sign in to Cinevest. This does not cost gas and authorizes your publications, uploads and viewing.",
         "",
         `URI: ${window.location.origin}`,
         "Version: 1",

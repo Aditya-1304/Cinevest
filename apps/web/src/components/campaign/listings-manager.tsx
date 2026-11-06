@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAccount, useConfig, useSignMessage } from "wagmi";
+import { useAccount, useConfig } from "wagmi";
 import { getAccount } from "wagmi/actions";
 import type { EIP1193Provider } from "viem";
 import { ARC_TESTNET } from "@/lib/chain";
 import { filmPath } from "@/lib/paths";
 import { extendCreatorListing } from "@/lib/arkiv-creator";
 import { fetchFilmDetail, fetchMarket, type MarketFilm } from "@/lib/market";
-import { signedPost } from "@/lib/publication-client";
+import { useAuthedPost } from "@/lib/use-authed-post";
 
 // Rabdi produces roughly one block every two seconds; the backend uses the same estimate.
 const BLOCKS_PER_DAY = 43_200n;
@@ -20,7 +20,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 function ListingRow({ film, onChanged }: { film: MarketFilm; onChanged: () => void }) {
   const { address, connector } = useAccount();
   const config = useConfig();
-  const { signMessageAsync } = useSignMessage();
+  const { post } = useAuthedPost();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const detail = useQuery({
@@ -42,8 +42,7 @@ function ListingRow({ film, onChanged }: { film: MarketFilm; onChanged: () => vo
   async function extend() {
     if (!address || target === undefined || busy) return;
     setBusy(true);
-    setMessage("Sign to check that this listing can be renewed…");
-    const sign = (text: string) => signMessageAsync({ message: text });
+    setMessage("Checking that this listing can be renewed…");
     const identity = {
       action: "extend-listing",
       actor: address,
@@ -52,10 +51,9 @@ function ListingRow({ film, onChanged }: { film: MarketFilm; onChanged: () => vo
       targetBlock: target.toString(),
     };
     try {
-      const preflight = await signedPost<{ authorized?: boolean; error?: string; status?: string }>(
+      const preflight = await post<{ authorized?: boolean; error?: string; status?: string }>(
         "/api/listings/extend",
         identity,
-        sign,
       );
       if (!preflight.ok) throw new Error(preflight.data.error ?? "Renewal was refused.");
       if (preflight.data.status === "confirmed") {
@@ -71,10 +69,9 @@ function ListingRow({ film, onChanged }: { film: MarketFilm; onChanged: () => vo
       for (let i = 0; i < 40 && getAccount(config).chainId !== ARC_TESTNET.id; i++) await sleep(250);
       const txHash = (sent as { txHash?: string }).txHash;
       setMessage("Recording the renewal…");
-      const recorded = await signedPost<{ status?: string; error?: string }>(
+      const recorded = await post<{ status?: string; error?: string }>(
         "/api/listings/extend",
         { ...identity, txHash },
-        sign,
       );
       if (!recorded.ok) throw new Error(recorded.data.error ?? "The renewal could not be recorded.");
       setMessage("Listing renewed.");

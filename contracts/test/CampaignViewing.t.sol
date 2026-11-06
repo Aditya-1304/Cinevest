@@ -46,10 +46,10 @@ contract CampaignViewingTest is CampaignEscrowTest {
         campaign.buyAccess();
         _release();
         _approveViewer(BOB);
-        vm.expectEmit(true, false, false, true, address(campaign));
-        emit WatchPurchased(BOB, terms.watchPrice);
         vm.expectEmit(false, false, false, true, address(campaign));
         emit RevenueCredited(8e6, 2e6);
+        vm.expectEmit(true, false, false, true, address(campaign));
+        emit WatchPurchased(BOB, terms.watchPrice);
         vm.prank(BOB);
         campaign.buyAccess();
         require(campaign.hasAccess(BOB) && campaign.hasPaidAccess(BOB), "access missing");

@@ -34,7 +34,7 @@ export function AppShell({
         compact && "flex h-screen flex-col overflow-hidden",
       )}
     >
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,#ffffff14_1px,transparent_1px),linear-gradient(to_bottom,#ffffff14_1px,transparent_1px)] bg-size-[122px_122px]" />
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-size-[122px_122px]" />
       <div
         data-scroll-root={compact ? "" : undefined}
         className={cn("flex flex-1 flex-col", compact && "min-h-0 overflow-y-auto")}

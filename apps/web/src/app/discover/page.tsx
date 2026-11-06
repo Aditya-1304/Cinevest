@@ -10,7 +10,9 @@ export default function DiscoverPage() {
       <h1>Films seeking backers.</h1>
       <p className="mb-6 max-w-[640px]">
         Listings are published by creators on Arkiv and checked against the
-        campaign contracts on Arc Testnet. Test USDC has no monetary value.
+        campaign contracts on Arc Testnet. Released films have a Watch button;
+        you buy access with test USDC on the film page. Test USDC has no
+        monetary value.
       </p>
       <DiscoverBoard />
     </AppShell>

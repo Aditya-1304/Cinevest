@@ -31,14 +31,15 @@ export type JournalResponse<T = Record<string, unknown>> = {
 export async function signedPost<T = Record<string, unknown>>(
   path: "/api/publications" | "/api/artifacts" | "/api/listings/extend",
   payload: Record<string, unknown>,
-  sign: SignMessage,
+  sign: SignMessage | null,
 ): Promise<JournalResponse<T>> {
   const body = { ...payload, issuedAt: Math.floor(Date.now() / 1000) };
-  const signature = await sign(publicationMessage(body));
+  // Without a signer the request is authorized by the SIWE session cookie instead.
+  const signature = sign ? await sign(publicationMessage(body)) : undefined;
   const response = await fetch(path, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ...body, signature }),
+    body: JSON.stringify(signature ? { ...body, signature } : body),
   });
   const data = (await response.json().catch(() => ({}))) as T;
   return { status: response.status, ok: response.ok, data };

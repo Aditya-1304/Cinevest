@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Address } from "viem";
 import { fetchFilmDetail, fetchPitch, posterUrl } from "@/lib/market";
+import { PosterImage } from "./poster-image";
 
 const BLOCKS_PER_DAY = 43_200n;
 
@@ -11,6 +13,22 @@ const LISTING: Record<string, { label: string; tone: string }> = {
   unlisted: { label: "Not listed on Arkiv", tone: "border-amber-400/40 bg-amber-400/15 text-amber-300" },
   unavailable: { label: "Listing status unavailable", tone: "border-white/20 bg-white/5 text-white/70" },
 };
+
+/** Long pitches are clamped so one verbose listing cannot dominate the page. */
+function ClampedText({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > 420;
+  return (
+    <div>
+      <p className={`text-sm whitespace-pre-wrap break-words text-white/80 ${long && !open ? "line-clamp-5" : ""}`}>{text}</p>
+      {long && (
+        <button type="button" className="mt-1 text-xs font-bold text-[#d3ed05] hover:text-[#e4ff1a]" onClick={() => setOpen(!open)}>
+          {open ? "Show less" : "Read more"}
+        </button>
+      )}
+    </div>
+  );
+}
 
 /**
  * Public story for a campaign: the poster and pitch are fetched through the backend, which checks
@@ -62,9 +80,7 @@ export function FilmStory({ campaign }: { campaign: Address }) {
 
   return (
     <article className="grid gap-4 rounded-2xl border border-white/10 bg-[#04141C] p-4 min-[641px]:grid-cols-[160px_minmax(0,1fr)]">
-      {/* Verified Swarm bytes served by the backend; next/image cannot optimize this URL. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <PosterImage
         src={posterUrl(manifest.posterRef)}
         alt={`${manifest.title} poster`}
         className="aspect-[2/3] w-full max-w-[160px] rounded-lg bg-[#072733] object-cover"
@@ -78,7 +94,7 @@ export function FilmStory({ campaign }: { campaign: Address }) {
           </span>
         </div>
         <h1 className="font-dela !my-1 text-[clamp(22px,3vw,34px)] uppercase">{manifest.title}</h1>
-        <p className="text-sm whitespace-pre-wrap text-white/80">{manifest.synopsis}</p>
+        <ClampedText text={manifest.synopsis} />
         <p className="text-xs text-white/50">{manifest.rightsNotice}</p>
         {detail.data.listingStatus === "unlisted" && (
           <p className="text-xs text-amber-300">

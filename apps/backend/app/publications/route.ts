@@ -12,6 +12,7 @@ import { referenceMatches } from "@/lib/swarm/artifact-validation";
 import { campaignTermsInput } from "@/lib/workflows/terms-input";
 import { readJson } from "@/lib/http";
 import { getArkivReceiptStatus } from "@/lib/workflows/arkiv-adapter";
+import { sessionAuthorizes } from "@/lib/wallet-auth";
 import {
   publicationMessage,
   publicationMessageIsRecent,
@@ -24,6 +25,7 @@ import {
   PublicationStateError,
   recordArkivTransaction,
   recordArcTransaction,
+  resetUnsentArkivPublication,
   retryFailedArkivPublication,
   runPublication,
   type PublicationStep,
@@ -34,7 +36,7 @@ const hex32 = z.string().regex(/^0x[0-9a-fA-F]{64}$/);
 const address = z.string().regex(/^0x[0-9a-fA-F]{40}$/);
 const digest = z.string().regex(/^[0-9a-f]{64}$/);
 const issuedAt = z.int().positive();
-const signature = z.string().regex(/^0x[0-9a-fA-F]+$/);
+const signature = z.string().regex(/^0x[0-9a-fA-F]+$/).optional();
 const terms = campaignTermsInput;
 
 const bodySchema = z.discriminatedUnion("action", [
@@ -76,10 +78,15 @@ const bodySchema = z.discriminatedUnion("action", [
     digest,
     entityId: hex32.optional(),
     arkivTxHash: hex32.optional(),
+    // The creator reports that no Arkiv transaction was produced; see the publishing branch below.
+    retry: z.literal(true).optional(),
     issuedAt,
     signature,
   }),
 ]);
+
+// Index delay allowance before an unsent listing slot may be reopened.
+const UNSENT_RETRY_AFTER_MS = 120_000;
 
 function stepForStatus(status: WorkflowOperation["status"]): PublicationStep {
   if (status === "published") return "complete";
@@ -119,11 +126,13 @@ function unauthorized() {
  * Every write is bound to the actor's wallet: the actor signs a canonical, short-lived message
  * rebuilt from the parsed request, so a stray actor field cannot poison a journal entry.
  */
-async function authorize(payload: Record<string, unknown>) {
+async function authorize(request: Request, payload: Record<string, unknown>) {
   const { signature: signatureText, ...messagePayload } = payload;
-  if (!publicationMessageIsRecent(messagePayload.issuedAt)) return false;
   const actor = messagePayload.actor;
   if (typeof actor !== "string" || !address.safeParse(actor).success) return false;
+  // A SIWE session replaces the per-request signature: one sign-in authorizes the whole publication.
+  if (signatureText === undefined) return sessionAuthorizes(request, actor);
+  if (!publicationMessageIsRecent(messagePayload.issuedAt)) return false;
   try {
     return await verifyMessage({
       address: actor as `0x${string}`,
@@ -162,7 +171,7 @@ export async function POST(request: NextRequest) {
   ) {
     return NextResponse.json({ error: "Swarm reference must match the Arc pitch commitment" }, { status: 400 });
   }
-  if (!(await authorize(input as unknown as Record<string, unknown>))) {
+  if (!(await authorize(request, input as unknown as Record<string, unknown>))) {
     return unauthorized();
   }
 
@@ -292,6 +301,31 @@ export async function POST(request: NextRequest) {
         },
       );
       return NextResponse.json(serialize(outcome.operation, outcome.nextStep, outcome.retryable));
+    }
+    if (
+      input.retry &&
+      operation.status === "publishing" &&
+      !operation.arkivTxHash &&
+      !operation.arkivEntityId
+    ) {
+      // No entity was found above and no transaction is journalled. After the index delay the
+      // creator may try again; a duplicate listing would share this digest and is deduplicated.
+      if (Date.now() - operation.updatedAt.getTime() < UNSENT_RETRY_AFTER_MS) {
+        return NextResponse.json(
+          { error: "An earlier listing attempt may still be indexing. Try again in a couple of minutes." },
+          { status: 409 },
+        );
+      }
+      await resetUnsentArkivPublication(store, input.actor, input.digest);
+      operation = await beginArkivPublication(store, input.actor, input.digest);
+      return NextResponse.json(
+        {
+          error: "The earlier attempt produced no listing; the connected creator may publish it",
+          authorized: true,
+          operation: serialize(operation),
+        },
+        { status: 409 },
+      );
     }
     if (operation.arkivTxHash || operation.arkivEntityId) {
       if (

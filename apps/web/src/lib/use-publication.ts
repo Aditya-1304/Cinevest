@@ -13,22 +13,16 @@ import {
   useAccount,
   useConfig,
   usePublicClient,
-  useSignMessage,
   useSwitchChain,
   useWriteContract,
 } from "wagmi";
 import { campaignFactoryAbi } from "@cinevest/abi";
 import { ARC_TESTNET, ARC_TESTNET_DEPLOYMENT } from "@/lib/chain";
 import { transactionErrorMessage } from "@/lib/transaction-error";
-import { publishCreatorListing } from "@/lib/arkiv-creator";
+import { hasRabdiFunds, publishCreatorListing } from "@/lib/arkiv-creator";
 import { encodePitch, pitchReference } from "@/lib/pitch-manifest";
-import {
-  fromWireTerms,
-  signedPost,
-  toWireTerms,
-  type SignMessage,
-  type WireTerms,
-} from "@/lib/publication-client";
+import { fromWireTerms, toWireTerms, type WireTerms } from "@/lib/publication-client";
+import { SignInRequiredError, useAuthedPost } from "@/lib/use-authed-post";
 
 export type StepKey = "poster" | "pitch" | "prepare" | "deploy" | "confirm" | "list";
 export const PUBLICATION_STEPS: { key: StepKey; label: string }[] = [
@@ -53,6 +47,8 @@ export type PublicationRecord = {
   digest?: string;
   swarmReference?: string;
   arcTxHash?: Hash;
+  /** Unique humans that must fund before a World-gated campaign opens to everyone. */
+  verifiedRound?: number;
   registered?: boolean;
   campaign?: `0x${string}`;
   confirmed?: boolean;
@@ -68,6 +64,7 @@ export type PublicationDraft = {
   rightsNotice: string;
   poster: { contentType: string; base64: string };
   terms: Parameters<typeof toWireTerms>[0];
+  verifiedRound?: number;
 };
 
 class FlowError extends Error {}
@@ -88,6 +85,24 @@ function saveRecord(record: PublicationRecord) {
     /* Storage can be blocked; the flow still runs but cannot resume after a reload. */
   }
 }
+// Unfinished publications set aside so the creator can start another film; each stays resumable.
+const archiveKey = (actor: string) => `cinevest.publication.archive.v1:${actor.toLowerCase()}`;
+function loadArchive(actor: string): PublicationRecord[] {
+  try {
+    const raw = window.localStorage.getItem(archiveKey(actor));
+    return raw ? (JSON.parse(raw) as PublicationRecord[]) : [];
+  } catch {
+    return [];
+  }
+}
+function saveArchive(actor: string, records: PublicationRecord[]) {
+  try {
+    window.localStorage.setItem(archiveKey(actor), JSON.stringify(records));
+  } catch {
+    /* Storage can be blocked; the set-aside publication then simply cannot be resumed later. */
+  }
+}
+
 function clearRecord(actor: string) {
   try {
     window.localStorage.removeItem(storageKey(actor));
@@ -118,10 +133,11 @@ export function usePublication() {
   const config = useConfig();
   const { address, connector, chainId } = useAccount();
   const client = usePublicClient({ chainId: ARC_TESTNET.id });
-  const { signMessageAsync } = useSignMessage();
+  const { post } = useAuthedPost();
   const { switchChainAsync } = useSwitchChain();
   const writer = useWriteContract();
   const [record, setRecord] = useState<PublicationRecord>();
+  const [archived, setArchived] = useState<PublicationRecord[]>([]);
   const [running, setRunning] = useState(false);
   const [active, setActive] = useState<StepKey>();
   const [failed, setFailed] = useState<StepKey>();
@@ -132,6 +148,7 @@ export function usePublication() {
   useEffect(() => {
     if (!address || busy.current) return;
     setRecord(loadRecord(address));
+    setArchived(loadArchive(address));
   }, [address]);
 
   // After the Rabdi write the wallet reports a chain wagmi does not know; signing only works
@@ -142,11 +159,6 @@ export function usePublication() {
       await sleep(250);
     }
   }, [config]);
-
-  const sign: SignMessage = useCallback(
-    (text) => signMessageAsync({ message: text }),
-    [signMessageAsync],
-  );
 
   const execute = useCallback(
     async (start: PublicationRecord, draft?: PublicationDraft) => {
@@ -173,11 +185,10 @@ export function usePublication() {
         if (!rec.posterRef) {
           if (!draft) throw new FlowError("The poster is missing; discard this record and start again.");
           current = "poster";
-          mark(current, "Sign to upload the poster to Swarm…");
-          const res = await signedPost<{ reference?: string }>(
+          mark(current, "Uploading the poster to Swarm…");
+          const res = await post<{ reference?: string }>(
             "/api/artifacts",
             { action: "artifact-upload", actor, kind: "poster", payload: draft.poster },
-            sign,
           );
           if (!res.ok || !res.data.reference)
             throw new FlowError(errorText(res.data, "Poster upload failed. Swarm may be unavailable; try again."));
@@ -202,7 +213,7 @@ export function usePublication() {
 
         if (!rec.digest) {
           current = "prepare";
-          mark(current, "Sign to open the publication journal (uploads the pitch to Swarm)…");
+          mark(current, "Opening the publication journal and uploading the pitch to Swarm…");
           const manifest = {
             title: rec.title.trim(),
             synopsis: rec.synopsis.trim(),
@@ -211,10 +222,9 @@ export function usePublication() {
             creator: actor.toLowerCase(),
             rightsNotice: rec.rightsNotice.trim(),
           };
-          const res = await signedPost<{ digest?: string; swarmReference?: string }>(
+          const res = await post<{ digest?: string; swarmReference?: string }>(
             "/api/publications",
             { action: "prepare", actor, arcChainId: ARC_TESTNET.id, terms: rec.terms, manifest },
-            sign,
           );
           if (res.status !== 202 || !res.data.digest)
             throw new FlowError(errorText(res.data, "The publication journal rejected the request."));
@@ -231,21 +241,33 @@ export function usePublication() {
           if (chainId !== ARC_TESTNET.id) await switchChainAsync({ chainId: ARC_TESTNET.id });
           mark(current, "Confirm the campaign deployment in your wallet…");
           const terms = fromWireTerms(rec.terms!);
-          const simulation = await client.simulateContract({
-            address: factory,
-            abi: campaignFactoryAbi,
-            functionName: "createCampaign",
-            args: [terms],
-            account: actor,
-          });
-          const hash = await writer.writeContractAsync({ ...simulation.request, chainId: ARC_TESTNET.id });
+          let hash: Hash;
+          if (rec.verifiedRound) {
+            const simulation = await client.simulateContract({
+              address: factory,
+              abi: campaignFactoryAbi,
+              functionName: "createCampaignWithVerifiedRound",
+              args: [terms, BigInt(rec.verifiedRound)],
+              account: actor,
+            });
+            hash = await writer.writeContractAsync({ ...simulation.request, chainId: ARC_TESTNET.id });
+          } else {
+            const simulation = await client.simulateContract({
+              address: factory,
+              abi: campaignFactoryAbi,
+              functionName: "createCampaign",
+              args: [terms],
+              account: actor,
+            });
+            hash = await writer.writeContractAsync({ ...simulation.request, chainId: ARC_TESTNET.id });
+          }
           submitted = true;
           patch({ arcTxHash: hash });
         }
         if (!rec.registered) {
           current = "deploy";
-          mark(current, "Sign to record the deployment transaction in the journal…");
-          const res = await signedPost(
+          mark(current, "Recording the deployment in the journal…");
+          const res = await post(
             "/api/publications",
             {
               action: "register",
@@ -255,7 +277,6 @@ export function usePublication() {
               arcTxHash: rec.arcTxHash,
               swarmReference: rec.swarmReference,
             },
-            sign,
           );
           if (res.status !== 202 && !res.ok)
             throw new FlowError(errorText(res.data, "Could not record the deployment in the journal."));
@@ -295,11 +316,10 @@ export function usePublication() {
         if (!rec.confirmed) {
           current = "confirm";
           for (let attempt = 0; attempt < 3 && !rec.confirmed; attempt++) {
-            mark(current, "Sign to let the journal confirm the campaign on Arc…");
-            const res = await signedPost<{ status?: string }>(
+            mark(current, "Letting the journal confirm the campaign on Arc…");
+            const res = await post<{ status?: string }>(
               "/api/publications",
               { action: "reconcile", actor, digest: rec.digest },
-              sign,
             );
             if (res.ok && ["confirmed", "publishing", "published"].includes(res.data.status ?? "")) {
               patch({ confirmed: true });
@@ -314,14 +334,32 @@ export function usePublication() {
         if (!rec.published) {
           current = "list";
           const campaign = rec.campaign!;
-          mark(current, "Sign to request the Arkiv listing slot…");
+          mark(current, "Requesting the Arkiv listing slot…");
           let status: string | undefined;
           if (!rec.entityId && !rec.arkivTxHash) {
-            const slot = await signedPost<{ status?: string; authorized?: boolean }>(
-              "/api/publications",
-              { action: "arkiv", actor, digest: rec.digest },
-              sign,
-            );
+            // Fail before the journal opens a slot: a wallet without tGLM cannot send the listing.
+            if (!(await hasRabdiFunds(actor)))
+              throw new FlowError(
+                `This wallet has no tGLM on Arkiv Rabdi (chain 7794095). Fund ${actor} from the Arkiv faucet, then press Resume. The campaign is already live on Arc.`,
+              );
+            type Slot = {
+              status?: string;
+              authorized?: boolean;
+              arkivTxHash?: string | null;
+              arkivEntityId?: string | null;
+            };
+            const askSlot = (retry = false) =>
+              post<Slot>(
+                "/api/publications",
+                { action: "arkiv", actor, digest: rec.digest, ...(retry ? { retry: true } : {}) },
+              );
+            let slot = await askSlot();
+            // A slot already marked publishing with no transaction on record means an earlier attempt
+            // stopped before sending (or is still indexing); ask the journal to reopen it.
+            if (slot.status === 202 && slot.data.status === "publishing" && !slot.data.arkivTxHash && !slot.data.arkivEntityId) {
+              mark(current, "Retrying the listing that did not complete earlier…");
+              slot = await askSlot(true);
+            }
             status = slot.data.status;
             if (slot.status === 409 && slot.data.authorized) {
               const detailRes = await fetch(`/api/film/${ARC_TESTNET.id}/${campaign}`, { cache: "no-store" });
@@ -355,14 +393,21 @@ export function usePublication() {
               patch({ entityId: created.entityKey, arkivTxHash: created.txHash });
             } else if (!slot.ok && slot.status !== 202) {
               throw new FlowError(errorText(slot.data, "The journal did not authorize the Arkiv listing."));
+            } else if (slot.data.arkivTxHash || slot.data.arkivEntityId) {
+              // The journal already holds the write; adopt its identifiers and wait for the index.
+              patch({
+                entityId: slot.data.arkivEntityId ?? undefined,
+                arkivTxHash: slot.data.arkivTxHash ?? undefined,
+              });
+            } else if (slot.data.status !== "published") {
+              throw new FlowError("The journal is still checking an earlier listing attempt. Wait a couple of minutes, then press Resume.");
             }
           }
           if (status !== "published" && (rec.entityId || rec.arkivTxHash)) {
-            mark(current, "Sign to record the Arkiv listing in the journal…");
-            await signedPost(
+            mark(current, "Recording the Arkiv listing in the journal…");
+            await post(
               "/api/publications",
               { action: "arkiv", actor, digest: rec.digest, entityId: rec.entityId, arkivTxHash: rec.arkivTxHash },
-              sign,
             );
           }
           mark(current, "Waiting for the listing to appear on Arkiv…");
@@ -382,14 +427,16 @@ export function usePublication() {
         setFailed(current);
         setActive(undefined);
         setMessage(
-          error instanceof FlowError ? error.message : transactionErrorMessage(error, submitted),
+          error instanceof FlowError || error instanceof SignInRequiredError
+            ? error.message
+            : transactionErrorMessage(error, submitted),
         );
       } finally {
         busy.current = false;
         setRunning(false);
       }
     },
-    [address, chainId, client, connector, sign, switchChainAsync, waitForArc, writer],
+    [address, chainId, client, connector, post, switchChainAsync, waitForArc, writer],
   );
 
   const start = useCallback(
@@ -402,6 +449,7 @@ export function usePublication() {
         genre: draft.genre,
         synopsis: draft.synopsis,
         rightsNotice: draft.rightsNotice,
+        verifiedRound: draft.verifiedRound,
       };
       saveRecord(fresh);
       setRecord(fresh);
@@ -423,6 +471,39 @@ export function usePublication() {
     setMessage("");
   }, [address, record]);
 
+  // Starts a new film: an unfinished publication is set aside (and stays resumable), a published
+  // one is simply cleared. Never discards a campaign that already exists on Arc.
+  const startNew = useCallback(() => {
+    if (!address || busy.current) return;
+    if (record && !record.published && record.digest) {
+      const next = [record, ...loadArchive(address).filter((item) => item.digest !== record.digest)];
+      saveArchive(address, next);
+      setArchived(next);
+    }
+    clearRecord(address);
+    setRecord(undefined);
+    setFailed(undefined);
+    setMessage("");
+  }, [address, record]);
+
+  // Brings a set-aside publication back as the active one (only while nothing else is active).
+  const restore = useCallback(
+    (digest: string) => {
+      if (!address || busy.current || (record && !record.published)) return;
+      const list = loadArchive(address);
+      const found = list.find((item) => item.digest === digest);
+      if (!found) return;
+      const rest = list.filter((item) => item.digest !== digest);
+      saveArchive(address, rest);
+      setArchived(rest);
+      saveRecord(found);
+      setRecord(found);
+      setFailed(undefined);
+      setMessage("");
+    },
+    [address, record],
+  );
+
   const steps = PUBLICATION_STEPS.map((step) => ({
     ...step,
     status: (stepDone(step.key, record)
@@ -434,5 +515,5 @@ export function usePublication() {
           : "idle") as StepStatus,
   }));
 
-  return { steps, record, running, message, failed, start, resume, discard };
+  return { steps, record, archived, running, message, failed, start, resume, discard, startNew, restore };
 }

@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { MAX_SYNOPSIS } from "@/lib/pitch-manifest";
 import { WalletConnect } from "@/components/wallet/wallet-connect";
 import { FinanceTermsForm } from "./finance-terms-form";
 import {
@@ -11,8 +15,11 @@ import {
   type ProposalDraft,
 } from "@/lib/proposal";
 
+const SYNOPSIS_UI_MAX = Math.min(MAX_SYNOPSIS, 2000);
+
 export function CreateWorkspace() {
   const [step, setStep] = useState(0);
+  const [formKey, setFormKey] = useState(0);
   const [reviewer, setReviewer] = useState("");
   const [proposal, setProposal] = useState<ProposalDraft>({
     title: "",
@@ -29,6 +36,13 @@ export function CreateWorkspace() {
       : proposal.poster && proposal.poster.size > MAX_POSTER_UI_BYTES
         ? "The poster must be 1 MiB or smaller."
         : undefined;
+  /** After a film is published or set aside, return to an empty form for the next one. */
+  const resetForNewFilm = () => {
+    setReviewer("");
+    setProposal({ title: "", genre: "", synopsis: "", rightsNotice: DEFAULT_RIGHTS_NOTICE, poster: null });
+    setFormKey((k) => k + 1);
+    setStep(0);
+  };
   const proposalHeading = useRef<HTMLHeadingElement>(null);
   const financeHeading = useRef<HTMLHeadingElement>(null);
   // Move focus only when the user switches steps; matching the initial value
@@ -56,7 +70,7 @@ export function CreateWorkspace() {
           <WalletConnect />
         </div>
       </div>
-      <div className="grid grid-cols-1 overflow-hidden rounded-2xl border border-white/10 bg-[#04141C] min-[761px]:h-[min(540px,calc(100svh-230px))] min-[761px]:grid-cols-[200px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 overflow-hidden rounded-2xl border border-white/10 bg-[#04141C] min-[761px]:grid-cols-[200px_minmax(0,1fr)]">
         <aside
           className="border-b border-white/10 bg-[#072733] px-5 py-5 min-[761px]:border-r min-[761px]:border-b-0 [&>button]:flex [&>button]:w-full [&>button]:cursor-pointer [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-md [&>button]:p-[10px] [&>button]:text-left [&>button]:text-xs [&>button]:text-white/60 [&>button_span]:text-[11px] [&>button_span]:text-white/40 [&>button[aria-current=step]]:bg-[#d3ed05]/10 [&>button[aria-current=step]]:text-white [&>button[aria-current=step]_span]:text-[#d3ed05] [&>p]:mb-3 [&>p]:text-xs [&>p]:font-bold"
           aria-label="Campaign setup steps"
@@ -92,10 +106,10 @@ export function CreateWorkspace() {
               </h2>
               <p>Give your future supporters a glimpse of your film.</p>
             </div>
-            <div className="grid grid-cols-1 gap-x-5 min-[761px]:grid-cols-2">
-              <div className="my-1.5 grid gap-1 [&_input]:w-full [&_input]:rounded-md [&_input]:border [&_input]:border-white/15 [&_input]:bg-[#072733] [&_input]:px-3 [&_input]:py-2.5 [&_input]:text-white [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-[#d3ed05] [&_input[aria-invalid=true]]:border-[#ef8888] [&_label]:text-[13px] [&_label]:font-bold [&_small]:text-[13px] [&_small]:leading-[1.6] [&_small]:text-white/60 [&_textarea]:w-full [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-white/15 [&_textarea]:bg-[#072733] [&_textarea]:px-3 [&_textarea]:py-2.5 [&_textarea:focus-visible]:outline-2 [&_textarea:focus-visible]:outline-offset-2 [&_textarea:focus-visible]:outline-[#d3ed05]">
-                <label htmlFor="film-title">Film title</label>
-                <input
+            <div className="grid grid-cols-1 gap-x-5 gap-y-3 min-[761px]:grid-cols-2 [&_small]:text-[11px] [&_small]:text-white/50">
+              <div className="grid gap-1.5">
+                <Label htmlFor="film-title">Film title</Label>
+                <Input
                   id="film-title"
                   placeholder="Your film title"
                   maxLength={100}
@@ -103,9 +117,9 @@ export function CreateWorkspace() {
                   onChange={(event) => edit({ title: event.target.value })}
                 />
               </div>
-              <div className="my-1.5 grid gap-1 [&_input]:w-full [&_input]:rounded-md [&_input]:border [&_input]:border-white/15 [&_input]:bg-[#072733] [&_input]:px-3 [&_input]:py-2.5 [&_input]:text-white [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-[#d3ed05] [&_input[aria-invalid=true]]:border-[#ef8888] [&_label]:text-[13px] [&_label]:font-bold [&_small]:text-[13px] [&_small]:leading-[1.6] [&_small]:text-white/60 [&_textarea]:w-full [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-white/15 [&_textarea]:bg-[#072733] [&_textarea]:px-3 [&_textarea]:py-2.5 [&_textarea:focus-visible]:outline-2 [&_textarea:focus-visible]:outline-offset-2 [&_textarea:focus-visible]:outline-[#d3ed05]">
-                <label htmlFor="film-genre">Genre</label>
-                <input
+              <div className="grid gap-1.5">
+                <Label htmlFor="film-genre">Genre</Label>
+                <Input
                   id="film-genre"
                   placeholder="e.g. Drama"
                   maxLength={60}
@@ -113,39 +127,41 @@ export function CreateWorkspace() {
                   onChange={(event) => edit({ genre: event.target.value })}
                 />
               </div>
-              <div className="my-1.5 grid gap-1 min-[761px]:col-span-2 [&_input]:w-full [&_input]:rounded-md [&_input]:border [&_input]:border-white/15 [&_input]:bg-[#072733] [&_input]:px-3 [&_input]:py-2.5 [&_label]:text-[13px] [&_label]:font-bold [&_textarea]:w-full [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-white/15 [&_textarea]:bg-[#072733] [&_textarea]:px-3 [&_textarea]:py-2.5">
-                <label htmlFor="film-pitch">Pitch</label>
-                <textarea
+              <div className="grid gap-1.5 min-[761px]:col-span-2">
+                <Label htmlFor="film-pitch">Pitch</Label>
+                <Textarea
                   id="film-pitch"
-                  rows={3}
+                  rows={4}
+                  maxLength={SYNOPSIS_UI_MAX}
                   placeholder="Tell supporters about your film"
                   value={proposal.synopsis}
                   onChange={(event) => edit({ synopsis: event.target.value })}
                 />
+                <small>
+                  {proposal.synopsis.length}/{SYNOPSIS_UI_MAX} characters
+                </small>
               </div>
-              <div className="my-1.5 grid gap-1 min-[761px]:col-span-2 [&_input]:w-full [&_input]:rounded-md [&_input]:border [&_input]:border-white/15 [&_input]:bg-[#072733] [&_input]:px-3 [&_input]:py-2.5 [&_label]:text-[13px] [&_label]:font-bold [&_textarea]:w-full [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-white/15 [&_textarea]:bg-[#072733] [&_textarea]:px-3 [&_textarea]:py-2.5">
-                <label htmlFor="reviewer">Independent reviewer wallet</label>
-                <input
+              <div className="grid gap-1.5 min-[761px]:col-span-2">
+                <Label htmlFor="reviewer">Independent reviewer wallet</Label>
+                <Input
                   id="reviewer"
                   placeholder="0x…"
                   value={reviewer}
                   onChange={(event) => setReviewer(event.target.value)}
                 />
               </div>
-              <div className="my-1.5 grid gap-1 min-[761px]:col-span-2 [&_input]:w-full [&_input]:rounded-md [&_input]:border [&_input]:border-white/15 [&_input]:bg-[#072733] [&_input]:px-3 [&_input]:py-2.5 [&_label]:text-[13px] [&_label]:font-bold [&_small]:text-[13px] [&_small]:text-white/60">
-                <label htmlFor="film-poster">Poster image</label>
-                <input
+              <div className="grid gap-1.5 min-[761px]:col-span-2">
+                <Label htmlFor="film-poster">Poster image</Label>
+                <Input
+                  key={`poster-${formKey}`}
                   id="film-poster"
                   type="file"
                   accept={POSTER_TYPES.join(",")}
                   aria-invalid={!!posterError}
-                  onChange={(event) =>
-                    edit({ poster: event.target.files?.[0] ?? null })
-                  }
+                  onChange={(event) => edit({ poster: event.target.files?.[0] ?? null })}
                 />
                 <small>
-                  JPEG, PNG, WebP or GIF, up to 1 MiB. Poster and pitch are
-                  public on Swarm.
+                  JPEG, PNG, WebP or GIF, up to 1 MiB. Poster and pitch are public on Swarm.
                 </small>
                 {posterError && (
                   <small role="alert" className="!text-[#ffaaaa]">
@@ -153,15 +169,13 @@ export function CreateWorkspace() {
                   </small>
                 )}
               </div>
-              <div className="my-1.5 grid gap-1 min-[761px]:col-span-2 [&_label]:text-[13px] [&_label]:font-bold [&_textarea]:w-full [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-white/15 [&_textarea]:bg-[#072733] [&_textarea]:px-3 [&_textarea]:py-2.5">
-                <label htmlFor="film-rights">Rights notice</label>
-                <textarea
+              <div className="grid gap-1.5 min-[761px]:col-span-2">
+                <Label htmlFor="film-rights">Rights notice</Label>
+                <Textarea
                   id="film-rights"
                   rows={2}
                   value={proposal.rightsNotice}
-                  onChange={(event) =>
-                    edit({ rightsNotice: event.target.value })
-                  }
+                  onChange={(event) => edit({ rightsNotice: event.target.value })}
                 />
               </div>
             </div>
@@ -188,7 +202,7 @@ export function CreateWorkspace() {
                 Define how funding and eligible receipts work for your film.
               </p>
             </div>
-            <FinanceTermsForm reviewer={reviewer} proposal={proposal} />
+            <FinanceTermsForm key={formKey} reviewer={reviewer} proposal={proposal} onNewFilm={resetForNewFilm} />
             <button
               type="button"
               className="hover:text-[#e4ff1a] mt-[18px] cursor-pointer border-0 bg-transparent text-xs font-bold text-[#d3ed05]"

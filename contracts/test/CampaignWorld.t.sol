@@ -202,7 +202,7 @@ contract CampaignWorldTest {
         bytes memory signature = _sign(campaign, authorization);
         MockUSDC failing = new MockUSDC(1);
         vm.etch(CampaignTypes.ARC_TESTNET_USDC, address(failing).code);
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "MockUSDC: transfer failed"));
+        vm.expectRevert(bytes("MockUSDC: transfer failed"));
         vm.prank(ALICE);
         campaign.contributeWithAuthorization(1, authorization, signature);
         require(!campaign.usedWorldAuthorizations(digest), "transfer consumed permission");

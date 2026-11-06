@@ -27,12 +27,14 @@ export function useWalletSupport(): WalletSupport {
   const [isContract, setIsContract] = useState<boolean | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only wallet detection after mount
     setHasInjected(!!(globalThis as EthereumWindow).ethereum);
   }, []);
 
   // EOA vs contract wallet detection via empty-code check (EIP-1271/smart accounts have code).
   useEffect(() => {
     if (!isConnected || !address || chainId !== ARC_TESTNET.id || !client) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when the wallet disconnects
       setIsContract(null);
       return;
     }

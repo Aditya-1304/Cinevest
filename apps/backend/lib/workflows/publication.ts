@@ -347,6 +347,27 @@ export async function completeArkivPublication(
 }
 
 /** Clears an Arkiv transaction only after its receipt proves it reverted. */
+/**
+ * Reopens a listing slot whose creator reports that no Arkiv transaction was produced (for example
+ * a wallet without tGLM). Only valid while no transaction or entity ID is journalled; callers must
+ * first rule out an indexed entity and wait out the index delay.
+ */
+export async function resetUnsentArkivPublication(
+  store: WorkflowStore,
+  actor: string,
+  requestDigest: string,
+) {
+  const operation = await store.find(canonicalActor(actor), requestDigest);
+  if (!operation) throw new PublicationStateError("Publication record is unavailable");
+  if (operation.status !== "publishing") {
+    throw new PublicationStateError("Arkiv publication is not awaiting reconciliation");
+  }
+  if (operation.arkivTxHash || operation.arkivEntityId) {
+    throw new PublicationConflictError("An Arkiv write is already journalled for this publication");
+  }
+  return advance(store, operation, "confirmed", undefined, true);
+}
+
 export async function retryFailedArkivPublication(
   store: WorkflowStore,
   actor: string,

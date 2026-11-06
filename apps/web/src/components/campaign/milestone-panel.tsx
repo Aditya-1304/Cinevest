@@ -5,7 +5,6 @@ import {
   usePublicClient,
   useReadContracts,
   useReadContract,
-  useSignMessage,
   useSwitchChain,
   useWriteContract,
 } from "wagmi";
@@ -23,7 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReleaseGateStatus, useReleaseGate } from "@/components/campaign/release-gate";
 import { TxStatus } from "@/components/ui/tx-status";
 import { useTxFlow } from "@/lib/use-tx-flow";
-import { signedPost } from "@/lib/publication-client";
+import { SignInRequiredError, useAuthedPost } from "@/lib/use-authed-post";
 import { posterUrl } from "@/lib/market";
 import { MAX_POSTER_UI_BYTES, POSTER_TYPES, posterPayload } from "@/lib/proposal";
 
@@ -98,7 +97,7 @@ export function MilestonePanel({
   const [evidenceText, setEvidenceText] = useState("");
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [upload, setUpload] = useState({ busy: false, message: "" });
-  const { signMessageAsync } = useSignMessage();
+  const { post } = useAuthedPost();
   const [toastOpen, setToastOpen] = useState(false);
   const flow = useTxFlow();
   const { address, chainId } = useAccount();
@@ -198,22 +197,20 @@ export function MilestonePanel({
   /** Uploads each image, then the signed milestone manifest; the result becomes the evidence reference. */
   async function uploadEvidence() {
     if (!address || upload.busy) return;
-    const sign = (text: string) => signMessageAsync({ message: text });
-    setUpload({ busy: true, message: "Sign to upload the evidence images…" });
+    setUpload({ busy: true, message: "Uploading the evidence images…" });
     try {
       const refs: string[] = [];
       for (const file of evidenceFiles) {
-        const res = await signedPost<{ reference?: string; error?: string }>(
+        const res = await post<{ reference?: string; error?: string }>(
           "/api/artifacts",
           { action: "artifact-upload", actor: address, kind: "poster", payload: await posterPayload(file) },
-          sign,
         );
         if (!res.ok || !res.data.reference)
           throw new Error(res.data.error ?? "An evidence image could not be uploaded.");
         refs.push(res.data.reference);
       }
-      setUpload({ busy: true, message: "Sign to publish the milestone manifest…" });
-      const manifest = await signedPost<{ reference?: string; error?: string }>(
+      setUpload({ busy: true, message: "Publishing the milestone manifest…" });
+      const manifest = await post<{ reference?: string; error?: string }>(
         "/api/artifacts",
         {
           action: "artifact-upload",
@@ -227,7 +224,6 @@ export function MilestonePanel({
             text: evidenceText.trim(),
           },
         },
-        sign,
       );
       if (!manifest.ok || !manifest.data.reference)
         throw new Error("The evidence manifest was refused. Only the campaign creator can publish it during Production.");
@@ -236,7 +232,7 @@ export function MilestonePanel({
     } catch (cause) {
       setUpload({
         busy: false,
-        message: cause instanceof Error ? cause.message : "Evidence upload failed.",
+        message: cause instanceof Error || cause instanceof SignInRequiredError ? cause.message : "Evidence upload failed.",
       });
     }
   }

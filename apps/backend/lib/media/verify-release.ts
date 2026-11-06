@@ -1,3 +1,4 @@
+import { logEvent } from "../log";
 import "server-only";
 import { type Address } from "viem";
 import { checkCreRelease } from "./cre";
@@ -16,7 +17,7 @@ export async function verifyRelease(arcChainId: string, campaignAddress: string,
   const checks: Record<string, boolean> = {};
   const finish = (reason?: string, cre?: Awaited<ReturnType<typeof checkCreRelease>>) => {
     const ok = !reason;
-    if (!ok) console.warn(JSON.stringify({ event: "media.release.verify_failed", arcChainId, campaignAddress, reason }));
+    if (!ok) logEvent("warn", "media.release.verify_failed", { campaign: campaignAddress, provider: "mux", arcChainId, reason });
     return { ok, reason, evidence: "cre-cli-simulation" as const, cre, checkedAt: new Date().toISOString(), checks };
   };
   const release = await getRelease(arcChainId, campaignAddress);

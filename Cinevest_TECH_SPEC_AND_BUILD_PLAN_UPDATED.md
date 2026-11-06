@@ -685,7 +685,7 @@ The following extensions increase depth without changing the core settlement mod
 - [ ] **P12.2 (B):** Add independently runnable read-only **Arkiv film explorer** route with cross-creator discovery. **Done:** real search works without Cinevest server's SQL tables.
 - [ ] **P12.3 (A):** Add third-party **sponsor USDC deposit** under independently approved conditions, feeding the existing waterfall. **Done:** deposited money is received onchain before any splitting; no fictitious YouTube income.
 - [ ] **P12.4 (A):** Add a **claim accounting trace** export from contract events that reproduces individual payouts. **Done:** CLI reconciles Arc logs and balances.
-- [ ] **P12.5 (B):** Add a **portable manifest explorer** showing pitch/milestones from Swarm and querying Arkiv directly. **Done:** independent read-only viewer needs no private service token.
+- [ ] **P12.5 (B):** Add a **portable manifest explorer** showing pitch/milestones from Swarm and qugit erying Arkiv directly. **Done:** independent read-only viewer needs no private service token.
 - [ ] **P12.6 (Both):** Add reviewer multisig signature threshold for milestone approval instead of a single reviewer, preserving stage invariants. **Done:** fewer than threshold signers cannot release escrow.
 - [ ] **P12.7 (B) [NEW, OPTIONAL]:** Extract the Phase 7 journal reconciler into a scheduled/background worker only if real workflow volume requires it. **Done:** retries remain idempotent across worker restart and concurrent execution.
 - [ ] **P12.8 (B) [NEW, OPTIONAL]:** Add independently verifiable Arc/Arkiv/Swarm/Livepeer consistency report for third-party explorers. **Done:** exporter never requires private media credentials or reveals them.
