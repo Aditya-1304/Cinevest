@@ -49,6 +49,7 @@ contract CampaignEscrowTest {
             worldGated: false,
             perHumanLimit: 0
         });
+        vm.prank(CREATOR);
         campaign = Campaign(factory.createCampaign(terms));
     }
 
@@ -422,7 +423,9 @@ contract CampaignEscrowTest {
 
     function test_CancelSnapshotIsOrderIndependentAndRetainsDust() external {
         terms.fundingGoal = 101;
+        vm.prank(CREATOR);
         Campaign first = Campaign(factory.createCampaign(terms));
+        vm.prank(CREATOR);
         Campaign second = Campaign(factory.createCampaign(terms));
         _smallFund(first, ALICE, 50);
         _smallFund(first, BOB, 51);
@@ -590,6 +593,7 @@ contract CampaignEscrowTest {
         CampaignTypes.CampaignTerms memory relTerms = terms;
         relTerms.fundingDeadline = uint64(block.timestamp + 100);
         relTerms.productionDeadline = uint64(block.timestamp + 200);
+        vm.prank(CREATOR);
         Campaign releasedCampaign = Campaign(factory.createCampaign(relTerms));
         token.mint(ALICE, GOAL);
         vm.prank(ALICE);

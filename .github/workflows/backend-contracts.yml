@@ -1,0 +1,21 @@
+name: Backend and contracts
+on:
+  push:
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci
+      - run: npm run contracts:test
+      - run: npm run contracts:build
+      - run: node scripts/assert-testnet-only.mjs
+      - run: npm run typecheck -w @cinevest/backend
+      - run: npm run test -w @cinevest/backend
+      - run: npx eslint apps/backend packages/abi --max-warnings 0
+      - run: npm run build -w @cinevest/backend

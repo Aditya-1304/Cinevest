@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { campaignTermsDigest } from "@reelance/abi/campaign-terms-digest";
+import { campaignTermsDigest } from "@cinevest/abi/campaign-terms-digest";
 import {
   validateFilmCandidate,
   verifyFilmCandidateTerms,
@@ -25,6 +25,12 @@ const terms = {
   worldGated: false,
   perHumanLimit: 0n,
 };
+
+test("terms digest has one stable vector shared by Arkiv writers and backend readers", () => {
+  assert.equal(campaignTermsDigest(5042002, terms), "0xb4a16482fe64d60a13b924f236e6884c2f91cf9acedfcf16d55c573f82cad3b1");
+  assert.notEqual(campaignTermsDigest(1, terms), campaignTermsDigest(5042002, terms));
+  assert.notEqual(campaignTermsDigest(5042002, { ...terms, worldGated: true }), campaignTermsDigest(5042002, terms));
+});
 
 function entity(overrides = {}) {
   return {

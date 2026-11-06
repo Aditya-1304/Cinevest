@@ -88,6 +88,7 @@ contract CampaignViewingTest is CampaignEscrowTest {
         terms.watchPrice = 10;
         terms.funderBps = 8000;
         terms.repaymentCapBps = 10000;
+        vm.prank(CREATOR);
         campaign = Campaign(factory.createCampaign(terms));
         // The shared funding helper supplies GOAL; use an exact small contribution here.
         MockUSDC token = MockUSDC(terms.usdc);

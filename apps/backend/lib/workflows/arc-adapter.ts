@@ -1,11 +1,11 @@
 import "server-only";
 
-import { createPublicClient, http } from "viem";
+import { verifiedArcClient } from "../arkiv/arc-client";
 import {
-  ARC_TESTNET,
   ARC_TESTNET_DEPLOYMENT,
   campaignAbi,
-} from "@reelance/abi";
+  campaignFactoryAbi,
+} from "@cinevest/abi";
 import {
   campaignTermsMatch,
   findCreatedCampaign,
@@ -15,13 +15,6 @@ import {
 import type { ArcConfirmation, PublicationDependencies } from "./publication";
 
 const RECENT_BLOCK_WINDOW = 50_000n;
-
-function arcClient() {
-  return createPublicClient({
-    chain: ARC_TESTNET,
-    transport: http(undefined, { timeout: 10_000, retryCount: 0 }),
-  });
-}
 
 type LogWithTx = RawLog & { transactionHash?: string | null };
 
@@ -34,12 +27,18 @@ type LogWithTx = RawLog & { transactionHash?: string | null };
 export function createArcConfirmation(options: {
   expectedTerms: Record<string, unknown> | null;
 }): PublicationDependencies["arc"]["confirm"] {
-  return async ({ arcTxHash, actor, campaignAddress }): Promise<ArcConfirmation> => {
+  return async ({ arcTxHash, actor }): Promise<ArcConfirmation> => {
     const factory = ARC_TESTNET_DEPLOYMENT.factoryAddress;
     if (!factory) throw new Error("Arc campaign factory is not configured");
-    const client = arcClient();
+    if (!ARC_TESTNET_DEPLOYMENT.compatible) throw new Error("Factory redeployment is required for the current contract revision");
+    const client = await verifiedArcClient(10_000);
+    const transaction = await client.getTransaction({ hash: arcTxHash as `0x${string}` });
+    if (transaction.from.toLowerCase() !== actor.toLowerCase() || transaction.to?.toLowerCase() !== factory.toLowerCase()) {
+      return { status: "failed", reason: "Creation transaction must be sent by the creator to the configured factory" };
+    }
 
     const matchesTerms = async (campaign: `0x${string}`) => {
+      if (!(await client.readContract({ address: factory, abi: campaignFactoryAbi, functionName: "isCampaign", args: [campaign] }))) return false;
       const terms = await client.readContract({
         address: campaign,
         abi: campaignAbi,
@@ -106,12 +105,6 @@ export function createArcConfirmation(options: {
         }
       }
       if (created) return { status: "confirmed", campaignAddress: created };
-      if (campaignAddress) {
-        const existing = campaignAddress as `0x${string}`;
-        if (await matchesTerms(existing)) {
-          return { status: "confirmed", campaignAddress: existing };
-        }
-      }
       return { status: "pending" };
     }
   };

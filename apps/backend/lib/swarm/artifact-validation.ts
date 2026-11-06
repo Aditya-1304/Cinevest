@@ -6,15 +6,22 @@ export const MAX_POSTER_BYTES = 5 * 1024 * 1024;
 export const SAFE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
 
 const safeImageTypes = new Set<string>(SAFE_IMAGE_TYPES);
-const pitchManifest = z.object({
-  schema: z.literal("clipstake.pitch.v1"),
+/** Shared write/read schema: every uploaded pitch is readable without a legacy field conversion. */
+const indexedText = z.string().trim().min(1).refine(value => Buffer.byteLength(value, "utf8") <= 128);
+export const pitchInputSchema = z.object({
+  title: indexedText,
+  synopsis: z.string().trim().min(1).max(16_384),
+  posterRef: z.string().regex(/^(0x)?[0-9a-fA-F]{64}$/).transform(value => value.replace(/^0x/i, "").toLowerCase()),
+  genre: indexedText,
+  creator: z.string().regex(/^0x[0-9a-fA-F]{40}$/).transform(value => value.toLowerCase()),
+  rightsNotice: z.string().trim().min(1).max(4096),
+}).strict();
+const pitchManifest = pitchInputSchema.extend({
+  schema: z.literal("Cinevest.pitch.v1"),
   manifestVersion: z.literal(1),
-  title: z.string().min(1).max(256),
-  genre: z.string().min(1).max(128),
-  pitch: z.string().min(1).max(16_384),
 }).strict();
 const milestoneManifest = z.object({
-  schema: z.literal("clipstake.milestone.v1"),
+  schema: z.literal("Cinevest.milestone.v1"),
   manifestVersion: z.literal(1),
   campaignAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
   milestoneIndex: z.union([z.literal(1), z.literal(2)]),

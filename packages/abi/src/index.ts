@@ -2,4 +2,6 @@
 export { campaignAbi } from "./campaign";
 export { campaignFactoryAbi } from "./campaignFactory";
 export { erc20Abi } from "./erc20";
+export { ARC_TESTNET, ARC_TESTNET_USDC, ARC_TESTNET_DEPLOYMENT, type CampaignTerms } from "./config";
+export { campaignTermsDigest } from "./campaign-terms-digest";
 export { arcTestnetDeployment } from "./deployment";

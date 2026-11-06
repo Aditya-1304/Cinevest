@@ -26,14 +26,14 @@ function toOperation(row: Row): WorkflowOperation {
     arkivEntityId: row.arkivEntityId,
     status: row.status as OperationStatus,
     retryCount: row.retryCount,
+    revision: row.revision,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
 }
 
 /** Every status change is one compare-and-set update, so a concurrent retry loses cleanly. */
-export function createWorkflowStore(): WorkflowStore {
-  const db = createDatabase();
+export function createWorkflowStore(db = createDatabase()): WorkflowStore {
   return {
     async insert(operation) {
       const [row] = await db
@@ -62,6 +62,7 @@ export function createWorkflowStore(): WorkflowStore {
         .set({
           ...input.patch,
           status: input.next,
+          revision: sql`${workflowOperations.revision} + 1`,
           updatedAt: new Date(),
           ...(input.incrementRetry
             ? { retryCount: sql`${workflowOperations.retryCount} + 1` }
@@ -72,6 +73,7 @@ export function createWorkflowStore(): WorkflowStore {
             eq(workflowOperations.id, input.id),
             eq(workflowOperations.actor, input.actor),
             eq(workflowOperations.status, input.expected),
+            eq(workflowOperations.revision, input.expectedRevision),
           ),
         )
         .returning();

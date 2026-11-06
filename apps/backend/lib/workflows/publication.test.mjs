@@ -52,13 +52,14 @@ function createStore() {
       );
       return row ? { ...row } : null;
     },
-    async transition({ id, actor, expected, next, patch, incrementRetry }) {
+    async transition({ id, actor, expected, expectedRevision, next, patch, incrementRetry }) {
       const row = rows.get(id);
-      if (!row || row.actor !== actor || row.status !== expected) return null;
+      if (!row || row.actor !== actor || row.status !== expected || row.revision !== expectedRevision) return null;
       const updated = {
         ...row,
         ...patch,
         status: next,
+        revision: row.revision + 1,
         retryCount: row.retryCount + (incrementRetry ? 1 : 0),
         updatedAt: new Date(),
       };
@@ -234,16 +235,16 @@ test("a lost Arkiv response never deploys a second Arc campaign", async () => {
     },
   };
   const first = await runPublication(store, dependencies, { ...base, terms: {} });
-  assert.equal(first.operation.status, "confirmed");
+  assert.equal(first.operation.status, "publishing");
   assert.equal(first.nextStep, "arkiv-publication");
   assert.equal(first.retryable, true);
-  assert.equal(first.operation.retryCount, 1);
+  assert.equal(first.operation.retryCount, 0);
 
   const second = await runPublication(store, dependencies, { ...base, terms: {} });
-  assert.equal(second.operation.status, "published");
-  assert.equal(second.nextStep, "complete");
+  assert.equal(second.operation.status, "publishing");
+  assert.equal(second.nextStep, "arkiv-publication");
   assert.equal(deployCalls, 1);
-  assert.equal(publishCalls, 2);
+  assert.equal(publishCalls, 1);
 });
 
 test("uncertain confirmation is reconciled without a new deployment", async () => {
@@ -395,7 +396,7 @@ test("an uncertain Arkiv write reconciles before a resubmit", async () => {
     },
   };
   const first = await runPublication(store, dependencies, { ...base, terms: {} });
-  assert.equal(first.operation.status, "confirmed");
+  assert.equal(first.operation.status, "publishing");
   assert.equal(first.nextStep, "arkiv-publication");
   assert.equal(first.retryable, true);
   assert.equal(publishCalls, 1);

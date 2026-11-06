@@ -34,11 +34,14 @@ test("streaming artifact reads enforce the configured byte limit", async () => {
 
 test("committed bytes and manifest versions are verified before use", async () => {
   const bytes = new TextEncoder().encode(JSON.stringify({
-    schema: "clipstake.pitch.v1",
+    schema: "Cinevest.pitch.v1",
     manifestVersion: 1,
     title: "A film",
     genre: "drama",
-    pitch: "A short pitch.",
+    synopsis: "A short pitch.",
+    posterRef: "ab".repeat(32),
+    creator: `0x${"11".repeat(20)}`,
+    rightsNotice: "Copyright remains with creator",
   }));
   const root = await ChunkSplitter.root(bytes);
   const reference = `0x${root.hash().toHex().toLowerCase()}`;
@@ -47,11 +50,14 @@ test("committed bytes and manifest versions are verified before use", async () =
   assert.equal(parsePitchManifest(decodeManifestJson(bytes)).manifestVersion, 1);
   assert.throws(
     () => parsePitchManifest({
-      schema: "clipstake.pitch.v1",
+      schema: "Cinevest.pitch.v1",
       manifestVersion: 2,
       title: "A film",
       genre: "drama",
-      pitch: "A short pitch.",
+      synopsis: "A short pitch.",
+    posterRef: "ab".repeat(32),
+    creator: `0x${"11".repeat(20)}`,
+    rightsNotice: "Copyright remains with creator",
     }),
     ArtifactInvalidError,
   );

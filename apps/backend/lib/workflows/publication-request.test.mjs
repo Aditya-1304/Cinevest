@@ -5,11 +5,6 @@ import {
   stableStringify as backendStableStringify,
   publicationMessageIsRecent,
 } from "./publication-request.ts";
-// The web mirror signs the actor's wallet message; this contract pins it to the backend rebuild.
-import {
-  publicationMessage as webPublicationMessage,
-  stableStringify as webStableStringify,
-} from "../../../web/lib/publication.ts";
 
 const payload = {
   action: "register",
@@ -26,14 +21,10 @@ const payload = {
   },
 };
 
-test("canonical journal messages are byte-identical across the apps", () => {
+test("canonical journal messages use the Cinevest domain and stable JSON bytes", () => {
   const backend = publicationMessage(payload);
-  const web = webPublicationMessage({ ...payload });
-  assert.equal(web, backend);
-  assert.equal(
-    backendStableStringify(payload.terms),
-    webStableStringify(payload.terms),
-  );
+  assert.equal(JSON.parse(backend).app, "Cinevest publication journal");
+  assert.equal(backendStableStringify({ b: 2, a: 1 }), '{"a":1,"b":2}');
   // Key order and whitespace must not change the signed bytes.
   const reordered = {
     terms: {

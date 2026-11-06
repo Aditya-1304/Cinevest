@@ -1,14 +1,8 @@
 import { decodeEventLog } from "viem";
+import { campaignFactoryAbi } from "@cinevest/abi";
 
-/** Mirrors the factory's canonical CampaignCreated event; kept local so it is testable offline. */
-export const campaignCreatedEvent = {
-  type: "event",
-  name: "CampaignCreated",
-  inputs: [
-    { name: "creator", type: "address", indexed: true },
-    { name: "campaign", type: "address", indexed: true },
-  ],
-} as const;
+/** Uses the compiler-generated event so receipt reconciliation cannot drift from deployed signatures. */
+export const campaignCreatedEvent = campaignFactoryAbi.find(entry => entry.type === "event" && entry.name === "CampaignCreated")!;
 
 export type RawLog = {
   address: string;

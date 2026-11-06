@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ArtifactInvalidError, fetchSwarmManifest, fetchSwarmPoster } from "@/lib/swarm/artifacts";
+import { queryFilmDetail } from "@/lib/arkiv/film-detail";
+import { ARC_TESTNET } from "@cinevest/abi";
+import { normalizeSwarmReference } from "@/lib/arkiv/candidate-validation";
 
 export async function GET(
   request: NextRequest,
@@ -20,6 +23,12 @@ export async function GET(
       const index = indexText === null ? undefined : Number(indexText);
       if (kind === "milestone" && (!campaign || !/^0x[0-9a-fA-F]{40}$/.test(campaign) || (index !== 1 && index !== 2))) {
         return NextResponse.json({ error: "Invalid milestone artifact identity" }, { status: 400 });
+      }
+      if (campaign) {
+        if (!/^0x[0-9a-fA-F]{40}$/.test(campaign)) return NextResponse.json({ error: "Invalid campaign" }, { status: 400 });
+        const film = await queryFilmDetail(ARC_TESTNET.id, campaign as `0x${string}`);
+        const commitment = kind === "pitch" ? film.terms.pitchReference : film.evidenceReferences[index! - 1];
+        if (normalizeSwarmReference(commitment) !== normalizeSwarmReference(reference)) throw new ArtifactInvalidError("Artifact does not match the campaign's Arc commitment");
       }
       return NextResponse.json(await fetchSwarmManifest(reference, kind, campaign, index), {
         headers: { "cache-control": "no-store" },

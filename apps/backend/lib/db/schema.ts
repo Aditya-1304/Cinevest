@@ -86,9 +86,23 @@ export const workflowOperations = pgTable("workflow_operations", {
   arkivEntityId: text("arkiv_entity_id"),
   status: text("status").notNull().default("pending"),
   retryCount: integer("retry_count").notNull().default(0),
+  revision: integer("revision").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("workflow_actor_request_unique").on(table.actor, table.requestDigest),
   uniqueIndex("workflow_campaign_unique").on(table.arcChainId, table.campaignAddress),
 ]);
+
+/** Tracks creator-signed listing renewals separately from immutable campaign publication identity. */
+export const listingExtensions = pgTable("listing_extensions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  actor: text("actor").notNull(),
+  entityId: text("entity_id").notNull(),
+  campaignAddress: text("campaign_address").notNull(),
+  targetBlock: text("target_block").notNull(),
+  txHash: text("tx_hash"),
+  status: text("status").notNull().default("pending"),
+  revision: integer("revision").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [uniqueIndex("listing_extension_identity").on(table.actor, table.entityId, table.targetBlock)]);

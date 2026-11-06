@@ -4,7 +4,8 @@ import { createPublicClient } from "@arkiv-network/sdk";
 import { rabdi } from "@arkiv-network/sdk/chains";
 import { and, asc, eq, gt, lte } from "@arkiv-network/sdk/query";
 import { key, str, u64 } from "@arkiv-network/sdk/schema";
-import { createPublicClient as createArcClient, http } from "viem";
+import { http } from "viem";
+import { verifiedArcClient } from "./arc-client";
 import {
   ARC_TESTNET,
   ARC_TESTNET_DEPLOYMENT,
@@ -12,7 +13,7 @@ import {
   campaignAbi,
   campaignFactoryAbi,
   type CampaignTerms,
-} from "@reelance/abi";
+} from "@cinevest/abi";
 import { getServerEnv } from "../env";
 import { readCampaignSnapshots } from "./arc-snapshot";
 import { discoverFilms, MAX_CANDIDATES, MAX_PAGES, type LoadedPage, type LoadPageRequest } from "./discovery";
@@ -79,15 +80,13 @@ export async function queryFilms({
 }) {
   const factory = ARC_TESTNET_DEPLOYMENT.factoryAddress;
   if (!factory) throw new Error("Arc campaign factory is not configured");
+  if (!ARC_TESTNET_DEPLOYMENT.compatible) throw new Error("Factory redeployment is required for the current contract revision");
   const chain = rabdi({ accessKey: getServerEnv().ARKIV_ACCESS_KEY ?? "" });
   const arkiv = createPublicClient({
     chain,
-    transport: http(undefined, { timeout: 5_000, retryCount: 0 }),
+    transport: http(getServerEnv().ARKIV_RPC_URL, { timeout: 5_000, retryCount: 0 }),
   });
-  const arc = createArcClient({
-    chain: ARC_TESTNET,
-    transport: http(undefined, { timeout: 5_000, retryCount: 0 }),
-  });
+  const arc = await verifiedArcClient();
   const excludedReasons: Record<string, number> = {};
   let temporarilyUnverifiable = 0;
   const reject = (reason: string) => {
@@ -143,7 +142,6 @@ export async function queryFilms({
     verify: async () => null,
     verifyBatch: async (rows) => {
       const checks = rows.map((row) => validateFilmCandidate(row, ARC_TESTNET.id));
-      const indexesByCampaign = new Map<string, number>();
       const candidates: { index: number; campaign: `0x${string}`; entity: FilmCandidate }[] = [];
       const output: (VerifiedFilm | null)[] = rows.map(() => null);
       checks.forEach((check, index) => {
@@ -151,11 +149,8 @@ export async function queryFilms({
           reject(check.reason);
           return;
         }
-        if (indexesByCampaign.has(check.campaign)) {
-          reject("duplicate_campaign");
-          return;
-        }
-        indexesByCampaign.set(check.campaign, index);
+        // Deduplicate only after immutable-term verification. A forged first row must not
+        // suppress a later valid listing for the same canonical campaign.
         candidates.push({ index, campaign: check.campaign, entity: check.entity });
       });
       if (!candidates.length) return output;
@@ -236,7 +231,7 @@ export async function queryFilms({
   return {
     entities: result.items,
     status: temporarilyUnverifiable > 0 && result.status === "complete" ? "partial" as const : result.status,
-    retryable: result.retryable || temporarilyUnverifiable > 0,
+    retryable: result.retryable || temporarilyUnverifiable > 0 || stale,
     completeness: result.completeness,
     nextCursor: result.nextCursor,
     excluded: Math.max(0, result.excluded - temporarilyUnverifiable),

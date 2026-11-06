@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { arcTestnetDeployment } from "@cinevest/abi";
 
 /**
  * Reports public network configuration and whether optional server integrations have credentials.
@@ -8,12 +9,13 @@ import { NextResponse } from "next/server";
 export function GET() {
   return NextResponse.json({
     status: "ok",
-    service: "reelance-backend",
+    service: "cinevest-backend",
     commit: process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA ?? null,
     networks: {
       arcSettlement: 5042002,
       arkivDiscovery: 7794095,
     },
+    factory: { address: arcTestnetDeployment.address, compatibleWithBuild: arcTestnetDeployment.compatible },
     configured: {
       database: Boolean(process.env.DATABASE_URL?.trim()),
       arkivAccessKey: Boolean(process.env.ARKIV_ACCESS_KEY?.trim()),

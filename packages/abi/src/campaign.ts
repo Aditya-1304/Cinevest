@@ -80,6 +80,19 @@ export const campaignAbi = [
   },
   {
     "type": "function",
+    "name": "CANCELLATION_GRACE_PERIOD",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "Q",
     "inputs": [],
     "outputs": [
@@ -152,6 +165,13 @@ export const campaignAbi = [
   {
     "type": "function",
     "name": "claimApprovedTranche",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "claimCancelledEscrow",
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
@@ -870,6 +890,31 @@ export const campaignAbi = [
   },
   {
     "type": "event",
+    "name": "PayoutPaid",
+    "inputs": [
+      {
+        "name": "claimant",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "kind",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "enum ICampaignEvents.PayoutKind"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "ProductionCancelled",
     "inputs": [
       {
@@ -896,6 +941,19 @@ export const campaignAbi = [
         "type": "address",
         "indexed": true,
         "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ReleaseConfigured",
+    "inputs": [
+      {
+        "name": "playbackIdHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
       }
     ],
     "anonymous": false
@@ -1153,6 +1211,11 @@ export const campaignAbi = [
   },
   {
     "type": "error",
+    "name": "FundingGoalTooHigh",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "FundingStageEnded",
     "inputs": []
   },
@@ -1185,6 +1248,11 @@ export const campaignAbi = [
   {
     "type": "error",
     "name": "NothingToRefund",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PitchReferenceRequired",
     "inputs": []
   },
   {

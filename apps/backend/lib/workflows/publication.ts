@@ -46,6 +46,7 @@ export type WorkflowOperation = {
   arkivEntityId: string | null;
   status: OperationStatus;
   retryCount: number;
+  revision: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -66,6 +67,7 @@ export type TransitionInput = {
   id: string;
   actor: string;
   expected: OperationStatus;
+  expectedRevision: number;
   next: OperationStatus;
   patch?: OperationPatch;
   incrementRetry?: boolean;
@@ -142,6 +144,7 @@ async function advance(
     id: operation.id,
     actor: operation.actor,
     expected: operation.status,
+    expectedRevision: operation.revision,
     next,
     patch,
     incrementRetry,
@@ -163,6 +166,7 @@ export async function beginPublication(
 ) {
   const actor = canonicalActor(input.actor);
   const arcChainId = String(input.arcChainId);
+  if (arcChainId !== "5042002") throw new PublicationConflictError("Only Arc Testnet campaigns are supported");
   const now = new Date();
   const inserted = await store.insert({
     id: input.id,
@@ -177,6 +181,7 @@ export async function beginPublication(
     arkivEntityId: null,
     status: "pending",
     retryCount: 0,
+    revision: 0,
     createdAt: now,
     updatedAt: now,
   });
@@ -336,21 +341,9 @@ export async function completeArkivPublication(
     throw new PublicationStateError("Arkiv publication was not started");
   }
   return advance(store, operation, "published", {
-    arkivEntityId: published.entityId,
-    arkivTxHash: published.txHash ?? null,
+    arkivEntityId: canonicalTransaction(published.entityId),
+    arkivTxHash: published.txHash ? canonicalTransaction(published.txHash) : operation.arkivTxHash,
   });
-}
-
-/** Return to confirmed so only the missing Arkiv publication is retried. */
-export async function retryArkivPublication(
-  store: WorkflowStore,
-  actor: string,
-  requestDigest: string,
-) {
-  const operation = await store.find(canonicalActor(actor), requestDigest);
-  if (!operation) throw new PublicationStateError("Publication record is unavailable");
-  if (operation.status !== "publishing") return operation;
-  return advance(store, operation, "confirmed", undefined, true);
 }
 
 /** Clears an Arkiv transaction only after its receipt proves it reverted. */
@@ -506,11 +499,9 @@ export async function runPublication(
         existing,
       );
     } else {
-      operation = await retryArkivPublication(
-        store,
-        operation.actor,
-        operation.requestDigest,
-      );
+      // Absence from an index does not prove a submitted write failed. Preserve uncertainty
+      // until its transaction receipt is reconciled; never grant a blind createEntity retry.
+      return { operation, nextStep: "arkiv-publication", retryable: true };
     }
   }
 
@@ -545,11 +536,6 @@ export async function runPublication(
           published,
         );
       } catch {
-        operation = await retryArkivPublication(
-          store,
-          operation.actor,
-          operation.requestDigest,
-        );
         return { operation, nextStep: "arkiv-publication", retryable: true };
       }
     } else {

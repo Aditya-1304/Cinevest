@@ -1,6 +1,6 @@
 import { addr, defineSchema, str, u64 } from "@arkiv-network/sdk/schema";
 
-export const filmSchema = defineSchema("clipstake.film.v1", {
+export const filmSchema = defineSchema("Cinevest.film.v1", {
   arcChainId: u64(),
   campaignAddress: addr().indexed(),
   creatorAddress: addr().indexed(),
@@ -10,7 +10,7 @@ export const filmSchema = defineSchema("clipstake.film.v1", {
   pitchSwarmRef: str(),
   posterSwarmRef: str(),
   termsDigest: str(),
-  operationDigest: str().optional(),
+  operationDigest: str().indexed().optional(),
   createdAt: u64(),
   schemaVersion: u64(),
 });

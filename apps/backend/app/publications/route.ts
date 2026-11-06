@@ -2,11 +2,15 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { verifyMessage } from "viem";
-import { ARC_TESTNET } from "@reelance/abi";
+import { ARC_TESTNET } from "@cinevest/abi";
 import { createWorkflowStore } from "@/lib/workflows/store";
 import { createArcConfirmation } from "@/lib/workflows/arc-adapter";
 import { findOwnedFilmEntity } from "@/lib/arkiv/verify-entity";
 import { uploadPublicBytes } from "@/lib/swarm/bee";
+import { encodePitch } from "@/lib/swarm/pitch";
+import { referenceMatches } from "@/lib/swarm/artifact-validation";
+import { campaignTermsInput } from "@/lib/workflows/terms-input";
+import { readJson } from "@/lib/http";
 import { getArkivReceiptStatus } from "@/lib/workflows/arkiv-adapter";
 import {
   publicationMessage,
@@ -20,7 +24,6 @@ import {
   PublicationStateError,
   recordArkivTransaction,
   recordArcTransaction,
-  retryArkivPublication,
   retryFailedArkivPublication,
   runPublication,
   type PublicationStep,
@@ -32,21 +35,21 @@ const address = z.string().regex(/^0x[0-9a-fA-F]{40}$/);
 const digest = z.string().regex(/^[0-9a-f]{64}$/);
 const issuedAt = z.int().positive();
 const signature = z.string().regex(/^0x[0-9a-fA-F]+$/);
-const ARKIV_RECONCILE_GRACE_MS = 60_000;
-const terms = z
-  .record(
-    z.string(),
-    z.union([z.string(), z.number(), z.boolean(), z.null()]),
-  )
-  .refine((value) => Object.keys(value).length > 0);
+const terms = campaignTermsInput;
 
 const bodySchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("prepare"), actor: address, arcChainId: z.literal(ARC_TESTNET.id),
+    terms, manifest: z.record(z.string(), z.unknown()), issuedAt, signature,
+  }),
   z.object({
     action: z.literal("swarm"),
     actor: address,
     title: z.string().min(1).max(256),
     genre: z.string().min(1).max(128),
-    pitch: z.string().min(1).max(16_384),
+    synopsis: z.string().min(1).max(16_384),
+    posterRef: hex32,
+    rightsNotice: z.string().min(1).max(4096),
     issuedAt,
     signature,
   }),
@@ -93,6 +96,8 @@ function serialize(operation: WorkflowOperation, nextStep?: PublicationStep, ret
     actor: operation.actor,
     status: operation.status,
     campaignAddress: operation.campaignAddress,
+    arcChainId: operation.arcChainId,
+    swarmReference: operation.swarmReference,
     arcTxHash: operation.arcTxHash,
     arkivTxHash: operation.arkivTxHash,
     arkivEntityId: operation.arkivEntityId,
@@ -133,7 +138,7 @@ async function authorize(payload: Record<string, unknown>) {
 export async function POST(request: NextRequest) {
   let body: unknown;
   try {
-    body = await request.json();
+    body = await readJson(request);
   } catch {
     return NextResponse.json({ error: "Invalid publication request" }, { status: 400 });
   }
@@ -143,7 +148,7 @@ export async function POST(request: NextRequest) {
   }
   const input = parsed.data;
   if (
-    input.action === "register" &&
+    (input.action === "register" || input.action === "prepare") &&
     typeof input.terms.creator === "string" &&
     input.terms.creator.toLowerCase() !== input.actor.toLowerCase()
   ) {
@@ -162,17 +167,23 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    if (input.action === "prepare") {
+      const { bytes } = encodePitch(input.manifest);
+      const manifest = JSON.parse(bytes.toString("utf8"));
+      if (manifest.creator.toLowerCase() !== input.actor.toLowerCase() || !(await referenceMatches(bytes, input.terms.pitchReference))) {
+        return NextResponse.json({ error: "Pitch bytes and creator must match the intended Arc commitment" }, { status: 400 });
+      }
+      const requestDigest = publicationDigest({ actor: input.actor.toLowerCase(), arcChainId: input.arcChainId, terms: input.terms });
+      const outcome = await runPublication(createWorkflowStore(), {
+        swarm: { upload: () => uploadPublicBytes(bytes) },
+        arc: { confirm: async () => ({ status: "pending" }) },
+      }, { id: randomUUID(), actor: input.actor, arcChainId: input.arcChainId, requestDigest,
+        termsJson: JSON.stringify(input.terms), payload: input.manifest });
+      return NextResponse.json(serialize(outcome.operation, outcome.nextStep, outcome.retryable), { status: 202 });
+    }
     if (input.action === "swarm") {
-      const manifest = Buffer.from(
-        JSON.stringify({
-          schema: "clipstake.pitch.v1",
-          manifestVersion: 1,
-          title: input.title,
-          genre: input.genre,
-          pitch: input.pitch,
-        }),
-        "utf8",
-      );
+      const { bytes: manifest } = encodePitch({ title: input.title, synopsis: input.synopsis,
+        posterRef: input.posterRef, genre: input.genre, creator: input.actor, rightsNotice: input.rightsNotice });
       const reference = (await uploadPublicBytes(manifest)).replace(/^0x/i, "");
       if (!/^[0-9a-fA-F]{64}$/.test(reference)) {
         throw new Error("Swarm returned an invalid pitch reference");
@@ -309,13 +320,9 @@ export async function POST(request: NextRequest) {
       );
     }
     if (operation.status === "publishing") {
-      if (Date.now() - operation.updatedAt.getTime() < ARKIV_RECONCILE_GRACE_MS) {
-        return NextResponse.json(
-          serialize(operation, "arkiv-publication", true),
-          { status: 202 },
-        );
-      }
-      operation = await retryArkivPublication(store, input.actor, input.digest);
+      // A missing response and delayed index cannot prove that no wallet transaction was sent.
+      // Keep the write uncertain until a stored receipt proves failure or its entity is found.
+      return NextResponse.json(serialize(operation, "arkiv-publication", true), { status: 202 });
     }
     if (operation.status === "confirmed") {
       operation = await beginArkivPublication(store, input.actor, input.digest);

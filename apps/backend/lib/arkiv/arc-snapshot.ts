@@ -6,10 +6,16 @@ export async function readCampaignSnapshots<TSnapshot>(
 ) {
   const blockNumber = await getBlockNumber();
   const snapshots: TSnapshot[] = [];
-  const width = Math.max(1, Math.min(8, Math.floor(concurrency)));
+  const width = Number.isFinite(concurrency) ? Math.max(1, Math.min(8, Math.floor(concurrency))) : 8;
+  const reads = new Map<string, Promise<TSnapshot>>();
   for (let start = 0; start < campaigns.length; start += width) {
     const batch = campaigns.slice(start, start + width);
-    snapshots.push(...(await Promise.all(batch.map((campaign) => readAtBlock(campaign, blockNumber)))));
+    snapshots.push(...(await Promise.all(batch.map((campaign) => {
+      const identity = campaign.toLowerCase();
+      let read = reads.get(identity);
+      if (!read) { read = readAtBlock(campaign, blockNumber); reads.set(identity, read); }
+      return read;
+    }))));
   }
   return { blockNumber, snapshots };
 }

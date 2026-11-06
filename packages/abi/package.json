@@ -5,8 +5,10 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./campaign-terms-digest": "./src/campaign-terms-digest.ts",
     "./Campaign.json": "./abi/Campaign.json",
     "./CampaignFactory.json": "./abi/CampaignFactory.json",
     "./IERC20.json": "./abi/IERC20.json"
-  }
+  },
+  "dependencies": { "viem": "^2.38.0" }
 }

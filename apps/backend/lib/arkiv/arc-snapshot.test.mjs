@@ -30,3 +30,11 @@ test("campaign reads share one pinned block and respect bounded concurrency", as
   assert.equal(rpcReads.length, 20);
   assert.ok(rpcReads.every((read) => read.blockNumber === 123n));
 });
+
+test("duplicate listings share Arc reads without dropping their independent metadata validation", async () => {
+  const campaign = `0x${"ab".repeat(20)}`;
+  let reads = 0;
+  const result = await readCampaignSnapshots([campaign, campaign, campaign.toUpperCase()], async () => 123n, async () => { reads++; return "verified"; }, 2);
+  assert.equal(reads, 1);
+  assert.deepEqual(result.snapshots, ["verified", "verified", "verified"]);
+});

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+
 /// @notice Shared immutable terms and lifecycle labels used by the factory and per-film campaigns.
 /// @dev Keep this tuple aligned with `packages/abi/src/campaign.ts`; frontend reads depend on it.
 library CampaignTypes {
@@ -15,10 +17,12 @@ library CampaignTypes {
 
     error UnsupportedChain(uint256 code);
     error CreatorRequired();
+    error PitchReferenceRequired();
     error ReviewerRequired();
     error ReviewerIndependent();
     error TokenUnsupported();
     error GoalRequired();
+    error FundingGoalTooHigh();
     error WatchPriceRequired();
     error FunderShareTooHigh();
     error RepaymentCapRequired();
@@ -73,9 +77,12 @@ library CampaignTypes {
         if (terms.watchPrice == 0) revert WatchPriceRequired();
         if (terms.funderBps > BPS) revert FunderShareTooHigh();
         if (terms.repaymentCapBps == 0) revert RepaymentCapRequired();
+        // The aggregate cap is read during purchases; reject terms whose cap cannot fit uint256.
+        if (terms.repaymentCapBps > BPS && terms.fundingGoal > Math.mulDiv(type(uint256).max, BPS, terms.repaymentCapBps)) revert FundingGoalTooHigh();
         if (terms.fundingDeadline <= block.timestamp) revert FundingDeadlineTooSoon();
         if (terms.productionDeadline <= terms.fundingDeadline) revert ProductionDeadlineTooSoon();
         if (terms.rightsDuration == 0) revert RightsDurationRequired();
+        if (terms.pitchReference == bytes32(0)) revert PitchReferenceRequired();
     }
 
     /// @notice Lifecycle states that gate contributions, escrow claims, release, and viewing.

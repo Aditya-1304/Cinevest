@@ -1,0 +1,45 @@
+{
+  "checkedAt": "2026-11-06T07:18:04.044Z",
+  "checks": [
+    {
+      "path": "/api/health",
+      "status": 200
+    },
+    {
+      "path": "/api/market?owner=invalid",
+      "status": 400
+    },
+    {
+      "path": "/api/market?genre=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "status": 400
+    },
+    {
+      "path": "/api/film/1/0x0000000000000000000000000000000000000001",
+      "status": 400
+    },
+    {
+      "path": "/api/publications",
+      "status": 400
+    },
+    {
+      "path": "/api/artifacts",
+      "status": 401
+    },
+    {
+      "path": "/api/listings/extend",
+      "status": 400
+    },
+    {
+      "path": "/api/workflows/invalid",
+      "status": 400
+    },
+    {
+      "path": "/api/swarm/invalid?kind=poster",
+      "status": 400
+    },
+    {
+      "path": "/api/arkiv-rpc",
+      "status": 400
+    }
+  ]
+}

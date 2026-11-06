@@ -1,10 +1,12 @@
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { keccak256 } from 'viem';
 
 const wallet = '0xB4C01A6bE9278Db57803BFb57C7a9a70117AfBFF';
 const rpc = 'https://rpc.testnet.arc.io';
 const artifact = JSON.parse(await readFile('contracts/out/CampaignFactory.sol/CampaignFactory.json', 'utf8'));
 const bytecode = artifact.bytecode.object;
+const creationBytecodeHash = keccak256(bytecode);
 
 /** Read public chain state; the browser wallet alone authorizes and submits deployment. */
 async function request(method, params = []) {
@@ -32,9 +34,25 @@ createServer(async (req, res) => {
       const tx = await request('eth_getTransactionByHash', [hash]);
       const receipt = await request('eth_getTransactionReceipt', [hash]);
       if (!tx || tx.from.toLowerCase() !== wallet.toLowerCase() || tx.to !== null || tx.input.toLowerCase() !== bytecode.toLowerCase() || !receipt || receipt.status !== '0x1' || !receipt.contractAddress) throw new Error('Deployment has not been verified');
-      if (await request('eth_getCode', [receipt.contractAddress, 'latest']) === '0x') throw new Error('No deployed code');
-      const deployment = { chainId: 5042002, contract: 'CampaignFactory', address: receipt.contractAddress, deployer: tx.from, transactionHash: hash, blockNumber: Number(BigInt(receipt.blockNumber)) };
+      const code = await request('eth_getCode', [receipt.contractAddress, 'latest']);
+      let normalized = code.slice(2);
+      let expected = artifact.deployedBytecode.object.slice(2);
+      for (const refs of Object.values(artifact.deployedBytecode.immutableReferences)) for (const { start, length } of refs) {
+        normalized = normalized.slice(0, start * 2) + '0'.repeat(length * 2) + normalized.slice((start + length) * 2);
+        expected = expected.slice(0, start * 2) + '0'.repeat(length * 2) + expected.slice((start + length) * 2);
+      }
+      if (normalized !== expected) throw new Error('Deployed runtime does not match the compiler artifact');
+      const usdc = await request('eth_call', [{ to: receipt.contractAddress, data: '0x' + artifact.methodIdentifiers['USDC()'] }, 'latest']);
+      if (usdc.slice(-40).toLowerCase() !== '3600000000000000000000000000000000000000') throw new Error('Incorrect USDC configuration');
+      const deployment = { chainId: 5042002, contract: 'CampaignFactory', address: receipt.contractAddress, deployer: tx.from, transactionHash: hash, blockNumber: Number(BigInt(receipt.blockNumber)), creationBytecodeHash, runtimeCodeHash: keccak256(code) };
       await mkdir('contracts/deployments', { recursive: true });
+      try {
+        const previous = JSON.parse(await readFile('contracts/deployments/arc-testnet.json', 'utf8'));
+        if (previous.transactionHash !== hash) {
+          await mkdir('contracts/deployments/history', { recursive: true });
+          await writeFile(`contracts/deployments/history/${previous.transactionHash}.json`, JSON.stringify(previous, null, 2) + '\n');
+        }
+      } catch (error) { if (error.code !== 'ENOENT') throw error; }
       await writeFile('contracts/deployments/arc-testnet.json', JSON.stringify(deployment, null, 2) + '\n');
       // Publish the verified address alongside the ABIs consumed by both application workspaces.
       await import(`./generate-abi.mjs?deployment=${hash}`);
@@ -69,7 +87,7 @@ document.getElementById('deploy').onclick = async function () {
   if (current[0]?.toLowerCase() !== '${wallet.toLowerCase()}') throw Error('Wallet account changed');
   status.textContent = 'Review the contract deployment and gas fee in your wallet.';
   const hash = await provider.request({method:'eth_sendTransaction',params:[{from:current[0],data:'${bytecode}',value:'0x0'}]});
-  localStorage.setItem('cinevestFactoryDeployment', hash);
+  localStorage.setItem('cinevestFactoryDeployment:${creationBytecodeHash}', hash);
   await verify(hash);
  } catch(error) { status.textContent = error.message; this.disabled = false; }
 };
@@ -83,7 +101,7 @@ async function verify(hash) {
  }
  throw Error('Confirmation not available yet. Refresh to check the saved transaction.');
 }
-const saved = localStorage.getItem('cinevestFactoryDeployment');
+const saved = localStorage.getItem('cinevestFactoryDeployment:${creationBytecodeHash}');
 if (saved) { document.getElementById('deploy').disabled = true; verify(saved).catch(error => {status.textContent = error.message;}); }
 </script>`);
   } catch (error) { res.writeHead(400); res.end(error.message); }

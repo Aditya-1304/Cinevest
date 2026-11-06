@@ -29,6 +29,8 @@ contract CampaignFactory {
         external
         returns (address campaign)
     {
+        if (terms.creator == address(0)) revert CampaignTypes.CreatorRequired();
+        if (msg.sender != terms.creator) revert CampaignTypes.CreatorOnly();
         campaign = address(new Campaign(terms));
         _isCampaign[campaign] = true;
         _campaigns.push(campaign);

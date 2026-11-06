@@ -17,7 +17,7 @@ test("pitch encoding is stable and rejects invalid manifests", () => {
     posterRef: pitch.posterRef.toUpperCase(),
   });
   assert.deepEqual(first, second);
-  assert.equal(JSON.parse(first.bytes.toString()).schema, "clipstake.pitch.v1");
+  assert.equal(JSON.parse(first.bytes.toString()).schema, "Cinevest.pitch.v1");
   assert.match(first.sha256, /^[0-9a-f]{64}$/);
   assert.throws(() => encodePitch({ ...pitch, posterRef: "invalid" }));
   assert.throws(() => encodePitch({ ...pitch, extra: "secret" }));

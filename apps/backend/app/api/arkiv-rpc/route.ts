@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerEnv } from "@/lib/env";
+import { readJson } from "@/lib/http";
 
 /**
  * Narrow relay for the creator wallet's own Rabdi RPC calls (reads, estimates, receipts and the
@@ -24,7 +25,7 @@ const ALLOWED_METHODS = new Set([
 export async function POST(request: NextRequest) {
     let body: unknown;
     try {
-        body = await request.json();
+        body = await readJson(request);
     } catch {
         return NextResponse.json(
             { jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } },
@@ -53,9 +54,9 @@ export async function POST(request: NextRequest) {
     } catch {
         key = "";
     }
-    const nodeUrl = key
+    const nodeUrl = getServerEnv().ARKIV_RPC_URL ?? (key
         ? `https://rpc.rabdi.db-chain.testnet.arkiv.network/${encodeURIComponent(key)}`
-        : "https://rpc.rabdi.db-chain.testnet.arkiv.network";
+        : "https://rpc.rabdi.db-chain.testnet.arkiv.network");
     try {
         const response = await fetch(nodeUrl, {
             method: "POST",

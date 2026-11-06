@@ -101,6 +101,7 @@ contract CampaignAccountingTest is CampaignViewingTest {
 
     function test_AccountingCapCrossingKeepsPurchasesAndClaimsOpen() external {
         terms.watchPrice = 1500e6;
+        vm.prank(CREATOR);
         campaign = Campaign(factory.createCampaign(terms));
         _release();
         _buy(BOB);

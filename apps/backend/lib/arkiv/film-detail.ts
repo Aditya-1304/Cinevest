@@ -4,7 +4,8 @@ import { createPublicClient as createArkivClient } from "@arkiv-network/sdk";
 import { rabdi } from "@arkiv-network/sdk/chains";
 import { asc, eq } from "@arkiv-network/sdk/query";
 import { addr } from "@arkiv-network/sdk/schema";
-import { createPublicClient, http, type Address } from "viem";
+import { http, type Address } from "viem";
+import { verifiedArcClient } from "./arc-client";
 import {
   ARC_TESTNET,
   ARC_TESTNET_DEPLOYMENT,
@@ -26,7 +27,8 @@ export async function queryFilmDetail(arcChainId: number, campaignAddress: Addre
   if (arcChainId !== ARC_TESTNET.id) throw new Error("Unsupported Arc chain");
   const factory = ARC_TESTNET_DEPLOYMENT.factoryAddress;
   if (!factory) throw new Error("Arc campaign factory is not configured");
-  const arc = createPublicClient({ chain: ARC_TESTNET, transport: http(undefined, { timeout: 5_000, retryCount: 0 }) });
+  if (!ARC_TESTNET_DEPLOYMENT.compatible) throw new Error("Factory redeployment is required for the current contract revision");
+  const arc = await verifiedArcClient();
   const { blockNumber, snapshots } = await readCampaignSnapshots(
     [campaignAddress],
     () => arc.getBlockNumber(),
@@ -64,7 +66,7 @@ export async function queryFilmDetail(arcChainId: number, campaignAddress: Addre
   try {
     const arkiv = createArkivClient({
       chain: rabdi({ accessKey: getServerEnv().ARKIV_ACCESS_KEY ?? "" }),
-      transport: http(undefined, { timeout: 5_000, retryCount: 0 }),
+      transport: http(getServerEnv().ARKIV_RPC_URL, { timeout: 5_000, retryCount: 0 }),
     });
     const page = await arkiv
       .select({
@@ -84,6 +86,7 @@ export async function queryFilmDetail(arcChainId: number, campaignAddress: Addre
         schemaVersion: true,
       })
       .from(filmSchema, { onMismatch: "throw" })
+      .ownedBy(campaign.terms.creator)
       .where(eq("campaignAddress", addr(campaignAddress)))
       .orderBy(asc("$key"))
       .limit(100)

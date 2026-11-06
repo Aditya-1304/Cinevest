@@ -7,6 +7,7 @@ import { CampaignTypes } from "../src/CampaignTypes.sol";
 
 /// @notice Minimal cheatcode surface for the focused phase-1 tests; the repo carries no forge-std dependency.
 interface Cheats {
+    function prank(address) external;
     function chainId(uint256) external;
     function expectRevert(bytes calldata) external;
 }
@@ -43,7 +44,9 @@ contract RegistryAndTranchesTest {
     }
 
     function test_RegistryKnowsOnlyCreatedCampaigns() external {
+        vm.prank(CREATOR);
         address first = factory.createCampaign(terms);
+        vm.prank(CREATOR);
         address second = factory.createCampaign(terms);
         require(factory.isCampaign(first), "first campaign missing");
         require(factory.isCampaign(second), "second campaign missing");
@@ -54,6 +57,7 @@ contract RegistryAndTranchesTest {
     }
 
     function test_CampaignAtRejectsOutOfRangeIndex() external {
+        vm.prank(CREATOR);
         factory.createCampaign(terms);
         vm.expectRevert(
             abi.encodeWithSelector(CampaignFactory.CampaignIndexOutOfBounds.selector, 1)
@@ -62,6 +66,7 @@ contract RegistryAndTranchesTest {
     }
 
     function test_TrancheStepsAreFullQuartersForDivisibleGoal() external {
+        vm.prank(CREATOR);
         Campaign campaign = Campaign(factory.createCampaign(terms));
         // 1_000e6 goal divides evenly: 40% / 30% / 30%.
         require(campaign.trancheAmount(0) == 400_000_000, "tranche 0 mismatch");
@@ -71,6 +76,7 @@ contract RegistryAndTranchesTest {
 
     function test_TrancheSumIsExactForTinyGoal() external {
         terms.fundingGoal = 3;
+        vm.prank(CREATOR);
         Campaign campaign = Campaign(factory.createCampaign(terms));
         uint256[3] memory tranches = campaign.trancheAmounts();
         // Floor rounding must not appear in or vanish from the sum: 1 + 1 + 1.
@@ -80,6 +86,7 @@ contract RegistryAndTranchesTest {
 
     function test_TrancheSumIsExactForNonDivisibleGoal() external {
         terms.fundingGoal = 101;
+        vm.prank(CREATOR);
         Campaign campaign = Campaign(factory.createCampaign(terms));
         uint256[3] memory tranches = campaign.trancheAmounts();
         // 40 + 30 + 31 from floor(40F/100) and floor(70F/100) differences.
@@ -89,6 +96,8 @@ contract RegistryAndTranchesTest {
 
     function test_TrancheSumIsExactAtGoalOverflowBoundary() external {
         terms.fundingGoal = type(uint256).max;
+        terms.repaymentCapBps = 10_000;
+        vm.prank(CREATOR);
         Campaign campaign = Campaign(factory.createCampaign(terms));
         uint256[3] memory tranches = campaign.trancheAmounts();
         // No reversion from percent multiplication; maximum goal stays fully allocated.
@@ -101,6 +110,8 @@ contract RegistryAndTranchesTest {
     function test_TrancheSumsExactlyForAnyAcceptedGoal(uint256 goal) external {
         if (goal == 0) return; // zero goals are rejected at creation, so nothing to check
         terms.fundingGoal = goal;
+        terms.repaymentCapBps = 10_000;
+        vm.prank(CREATOR);
         Campaign campaign = Campaign(factory.createCampaign(terms));
         uint256[3] memory tranches = campaign.trancheAmounts();
         require(tranches[0] + tranches[1] + tranches[2] == goal, "fuzz sum mismatch");
@@ -112,6 +123,7 @@ contract RegistryAndTranchesTest {
     }
 
     function test_TrancheGettersRejectInvalidIndex() external {
+        vm.prank(CREATOR);
         Campaign campaign = Campaign(factory.createCampaign(terms));
         vm.expectRevert(abi.encodeWithSelector(CampaignTypes.TrancheIndexOutOfBounds.selector, 3));
         campaign.trancheAmount(3);

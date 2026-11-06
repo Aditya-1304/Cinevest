@@ -26,15 +26,21 @@ export const serverEnvSchema = z.object({
   APP_URL: optionalUrl,
   SESSION_SECRET: optionalSecret,
   DATABASE_URL: optionalText,
+  DATABASE_URL_UNPOOLED: optionalText,
+  ARC_RPC_URL: optionalUrl,
+  ARKIV_RPC_URL: optionalUrl,
   ARKIV_ACCESS_KEY: optionalText,
   SWARM_BEE_URL: optionalUrl,
   SWARM_GATEWAY_URL: optionalUrl,
   SWARM_POSTAGE_BATCH_ID: optionalText,
   SWARM_BEE_API_KEY: optionalText,
   LIVEPEER_API_KEY: optionalText,
+  LIVEPEER_SIGNING_KEY: optionalText,
   LIVEPEER_WEBHOOK_SECRET: optionalText,
   WORLD_RP_ID: optionalText,
   WORLD_RP_SIGNING_KEY: optionalText,
+  WORLD_APP_ID: optionalText,
+  WORLD_ACTION: optionalText,
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;

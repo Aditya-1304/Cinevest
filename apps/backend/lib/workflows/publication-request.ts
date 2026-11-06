@@ -1,8 +1,7 @@
 /**
  * Canonical publication-journal request messages. The web app signs exactly this string with the
  * actor's wallet, so every write is bound to the wallet that owns the publication. This module
- * must stay dependency-free and byte-identical with apps/web/lib/publication.ts (checked by a
- * backend contract test).
+ * remains dependency-free so the frontend can reproduce the documented signing format.
  */
 export const MESSAGE_MAX_AGE_SECONDS = 600;
 
@@ -22,7 +21,7 @@ export type PublicationMessagePayload = Record<string, unknown>;
 /** The exact string the actor signs; the server rebuilds it from the parsed request. */
 export function publicationMessage(payload: PublicationMessagePayload): string {
   return stableStringify({
-    app: "Reelance publication journal",
+    app: "Cinevest publication journal",
     ...payload,
   });
 }

@@ -13,7 +13,7 @@ export async function getArkivReceiptStatus(hash: string): Promise<ArkivReceiptS
   const chain = rabdi({ accessKey: getServerEnv().ARKIV_ACCESS_KEY ?? "" });
   const client = createPublicClient({
     chain,
-    transport: http(undefined, { timeout: 5_000, retryCount: 0 }),
+    transport: http(getServerEnv().ARKIV_RPC_URL, { timeout: 5_000, retryCount: 0 }),
   });
   try {
     const receipt = await client.getTransactionReceipt({ hash: hash as `0x${string}` });
