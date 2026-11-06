@@ -81,6 +81,16 @@ export function normalizeImageContentType(value: string | null) {
   return type && safeImageTypes.has(type) ? type : null;
 }
 
+/** Bee serves raw /bytes data as octet-stream, so identify allowed images from their magic bytes. */
+export function sniffImageContentType(bytes: Uint8Array) {
+  const header = Buffer.from(bytes.slice(0, 12));
+  if (header.subarray(0, 8).toString("hex") === "89504e470d0a1a0a") return "image/png";
+  if (header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) return "image/jpeg";
+  if (/^GIF8[79]a/.test(header.toString("ascii"))) return "image/gif";
+  if (header.toString("ascii", 0, 4) === "RIFF" && header.toString("ascii", 8, 12) === "WEBP") return "image/webp";
+  return null;
+}
+
 export async function readBounded(response: Response, limit: number) {
   const declared = Number(response.headers.get("content-length"));
   if (Number.isFinite(declared) && declared > limit) {

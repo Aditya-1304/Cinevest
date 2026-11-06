@@ -113,6 +113,12 @@ export function CampaignActions({
         args: [2n],
         chainId: ARC_TESTNET.id,
       },
+      {
+        address: campaign,
+        abi: campaignAbi,
+        functionName: "CANCELLATION_GRACE_PERIOD",
+        chainId: ARC_TESTNET.id,
+      },
     ],
     query: { enabled: !!address, refetchInterval: 15_000 },
   });
@@ -135,6 +141,7 @@ export function CampaignActions({
   const ready =
     !!address && !flow.busy && flow.state !== "uncertain" && !readsFailed;
   const creator = address?.toLowerCase() === terms.creator.toLowerCase();
+  const reviewer = address?.toLowerCase() === terms.reviewer.toLowerCase();
   // Both claim amounts are cumulative-supply minus cumulative-withdrawn, clamped to zero.
   const creatorDue =
     allocated !== undefined && claimed !== undefined
@@ -156,6 +163,27 @@ export function CampaignActions({
   const dispute1 = disputeAt(8);
   const dispute2 = disputeAt(9);
   const disputePending = dispute1 === 1 || dispute2 === 1;
+  const graceRead = reads.data?.[10];
+  const gracePeriod =
+    graceRead?.status === "success" ? (graceRead.result as bigint) : undefined;
+  // cancelProduction: the reviewer may cancel once the deadline passes; anyone
+  // else waits out the on-chain grace period (7 days).
+  const now =
+    block.data !== undefined ? BigInt(block.data.timestamp) : undefined;
+  const productionDeadlinePassed =
+    now !== undefined && now >= terms.productionDeadline;
+  const gracePassed =
+    productionDeadlinePassed &&
+    gracePeriod !== undefined &&
+    now >= terms.productionDeadline + gracePeriod;
+  const canCancelProduction =
+    stage === 2 && productionDeadlinePassed && (reviewer || gracePassed);
+  const cancelHint =
+    !productionDeadlinePassed
+      ? "Cancellation unlocks when the production deadline passes."
+      : !reviewer && !gracePassed
+        ? "Only the configured reviewer can cancel while the seven-day grace period after the deadline runs; anyone can cancel afterwards."
+        : "Cancelling returns each contributor's pro-rata share of unspent production escrow.";
   const trancheHint = () => {
     if (!creator)
       return "Only the campaign creator can claim production funds.";
@@ -204,6 +232,8 @@ export function CampaignActions({
     action:
       | "contribute"
       | "claimFundingRefund"
+      | "claimCancelledEscrow"
+      | "cancelProduction"
       | "claimFunderRevenue"
       | "claimCreatorRevenue"
       | "claimApprovedTranche"
@@ -404,9 +434,11 @@ export function CampaignActions({
             <>
               <Button
                 disabled={!ready || contribution === undefined || contribution <= 0n}
-                onClick={() => void transact("claimFundingRefund")}
+                onClick={() =>
+                  void transact(stage === 4 ? "claimCancelledEscrow" : "claimFundingRefund")
+                }
               >
-                Claim funding refund
+                {stage === 4 ? "Claim cancelled escrow" : "Claim funding refund"}
               </Button>
               {contribution === 0n && (
                 <p role="status">
@@ -414,6 +446,17 @@ export function CampaignActions({
                 </p>
               )}
             </>
+          )}
+          {stage === 2 && (
+            <Button
+              disabled={!ready || !canCancelProduction}
+              onClick={() => void transact("cancelProduction")}
+            >
+              Cancel production
+            </Button>
+          )}
+          {stage === 2 && productionDeadlinePassed && (
+            <p role="status">{cancelHint}</p>
           )}
           <Button
             disabled={!ready || claimable === undefined || claimable <= 0n}

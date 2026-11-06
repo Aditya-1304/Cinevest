@@ -3,10 +3,32 @@
 import { useEffect, useRef, useState } from "react";
 import { WalletConnect } from "@/components/wallet/wallet-connect";
 import { FinanceTermsForm } from "./finance-terms-form";
+import {
+  DEFAULT_RIGHTS_NOTICE,
+  MAX_POSTER_UI_BYTES,
+  POSTER_TYPES,
+  proposalIssue,
+  type ProposalDraft,
+} from "@/lib/proposal";
 
 export function CreateWorkspace() {
   const [step, setStep] = useState(0);
   const [reviewer, setReviewer] = useState("");
+  const [proposal, setProposal] = useState<ProposalDraft>({
+    title: "",
+    genre: "",
+    synopsis: "",
+    rightsNotice: DEFAULT_RIGHTS_NOTICE,
+    poster: null,
+  });
+  const edit = (patch: Partial<ProposalDraft>) =>
+    setProposal((current) => ({ ...current, ...patch }));
+  const posterError =
+    proposal.poster && !POSTER_TYPES.includes(proposal.poster.type)
+      ? "Use a JPEG, PNG, WebP or GIF image."
+      : proposal.poster && proposal.poster.size > MAX_POSTER_UI_BYTES
+        ? "The poster must be 1 MiB or smaller."
+        : undefined;
   const proposalHeading = useRef<HTMLHeadingElement>(null);
   const financeHeading = useRef<HTMLHeadingElement>(null);
   // Move focus only when the user switches steps; matching the initial value
@@ -26,8 +48,8 @@ export function CreateWorkspace() {
             Bring your story to life.
           </h1>
           <p>
-            Sketch your campaign in two steps. Deployment to Arc Testnet is
-            live; Swarm pitch upload and Arkiv listing come later.
+            Describe your film, set the terms and publish: your pitch goes to
+            Swarm, the campaign to Arc Testnet and the listing to Arkiv.
           </p>
         </div>
         <div className="mt-6 min-w-[210px] text-xs min-[761px]:mt-0 min-[761px]:max-w-[300px]">
@@ -52,10 +74,11 @@ export function CreateWorkspace() {
             </button>
           ))}
           <div className="text-[#d3ed05] mx-3 mt-5 text-xs font-bold min-[761px]:mt-10 [&_small]:mt-1 [&_small]:block [&_small]:leading-[1.6] [&_small]:font-normal [&_small]:text-white/50">
-            Live on Arc Testnet
+            Live on Arc, Swarm and Arkiv
             <br />
             <small>
-              Swarm pitch upload and Arkiv listing unlock at later steps.
+              Poster and pitch are public and stored on Swarm. Terms are final
+              once the campaign is deployed.
             </small>
           </div>
         </aside>
@@ -72,11 +95,23 @@ export function CreateWorkspace() {
             <div className="grid grid-cols-1 gap-x-5 min-[761px]:grid-cols-2">
               <div className="my-1.5 grid gap-1 [&_input]:w-full [&_input]:rounded-md [&_input]:border [&_input]:border-white/15 [&_input]:bg-[#072733] [&_input]:px-3 [&_input]:py-2.5 [&_input]:text-white [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-[#d3ed05] [&_input[aria-invalid=true]]:border-[#ef8888] [&_label]:text-[13px] [&_label]:font-bold [&_small]:text-[13px] [&_small]:leading-[1.6] [&_small]:text-white/60 [&_textarea]:w-full [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-white/15 [&_textarea]:bg-[#072733] [&_textarea]:px-3 [&_textarea]:py-2.5 [&_textarea:focus-visible]:outline-2 [&_textarea:focus-visible]:outline-offset-2 [&_textarea:focus-visible]:outline-[#d3ed05]">
                 <label htmlFor="film-title">Film title</label>
-                <input id="film-title" placeholder="Your film title" />
+                <input
+                  id="film-title"
+                  placeholder="Your film title"
+                  maxLength={100}
+                  value={proposal.title}
+                  onChange={(event) => edit({ title: event.target.value })}
+                />
               </div>
               <div className="my-1.5 grid gap-1 [&_input]:w-full [&_input]:rounded-md [&_input]:border [&_input]:border-white/15 [&_input]:bg-[#072733] [&_input]:px-3 [&_input]:py-2.5 [&_input]:text-white [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-[#d3ed05] [&_input[aria-invalid=true]]:border-[#ef8888] [&_label]:text-[13px] [&_label]:font-bold [&_small]:text-[13px] [&_small]:leading-[1.6] [&_small]:text-white/60 [&_textarea]:w-full [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-white/15 [&_textarea]:bg-[#072733] [&_textarea]:px-3 [&_textarea]:py-2.5 [&_textarea:focus-visible]:outline-2 [&_textarea:focus-visible]:outline-offset-2 [&_textarea:focus-visible]:outline-[#d3ed05]">
                 <label htmlFor="film-genre">Genre</label>
-                <input id="film-genre" placeholder="e.g. Drama" />
+                <input
+                  id="film-genre"
+                  placeholder="e.g. Drama"
+                  maxLength={60}
+                  value={proposal.genre}
+                  onChange={(event) => edit({ genre: event.target.value })}
+                />
               </div>
               <div className="my-1.5 grid gap-1 min-[761px]:col-span-2 [&_input]:w-full [&_input]:rounded-md [&_input]:border [&_input]:border-white/15 [&_input]:bg-[#072733] [&_input]:px-3 [&_input]:py-2.5 [&_label]:text-[13px] [&_label]:font-bold [&_textarea]:w-full [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-white/15 [&_textarea]:bg-[#072733] [&_textarea]:px-3 [&_textarea]:py-2.5">
                 <label htmlFor="film-pitch">Pitch</label>
@@ -84,6 +119,8 @@ export function CreateWorkspace() {
                   id="film-pitch"
                   rows={3}
                   placeholder="Tell supporters about your film"
+                  value={proposal.synopsis}
+                  onChange={(event) => edit({ synopsis: event.target.value })}
                 />
               </div>
               <div className="my-1.5 grid gap-1 min-[761px]:col-span-2 [&_input]:w-full [&_input]:rounded-md [&_input]:border [&_input]:border-white/15 [&_input]:bg-[#072733] [&_input]:px-3 [&_input]:py-2.5 [&_label]:text-[13px] [&_label]:font-bold [&_textarea]:w-full [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-white/15 [&_textarea]:bg-[#072733] [&_textarea]:px-3 [&_textarea]:py-2.5">
@@ -95,15 +132,43 @@ export function CreateWorkspace() {
                   onChange={(event) => setReviewer(event.target.value)}
                 />
               </div>
+              <div className="my-1.5 grid gap-1 min-[761px]:col-span-2 [&_input]:w-full [&_input]:rounded-md [&_input]:border [&_input]:border-white/15 [&_input]:bg-[#072733] [&_input]:px-3 [&_input]:py-2.5 [&_label]:text-[13px] [&_label]:font-bold [&_small]:text-[13px] [&_small]:text-white/60">
+                <label htmlFor="film-poster">Poster image</label>
+                <input
+                  id="film-poster"
+                  type="file"
+                  accept={POSTER_TYPES.join(",")}
+                  aria-invalid={!!posterError}
+                  onChange={(event) =>
+                    edit({ poster: event.target.files?.[0] ?? null })
+                  }
+                />
+                <small>
+                  JPEG, PNG, WebP or GIF, up to 1 MiB. Poster and pitch are
+                  public on Swarm.
+                </small>
+                {posterError && (
+                  <small role="alert" className="!text-[#ffaaaa]">
+                    {posterError}
+                  </small>
+                )}
+              </div>
+              <div className="my-1.5 grid gap-1 min-[761px]:col-span-2 [&_label]:text-[13px] [&_label]:font-bold [&_textarea]:w-full [&_textarea]:rounded-md [&_textarea]:border [&_textarea]:border-white/15 [&_textarea]:bg-[#072733] [&_textarea]:px-3 [&_textarea]:py-2.5">
+                <label htmlFor="film-rights">Rights notice</label>
+                <textarea
+                  id="film-rights"
+                  rows={2}
+                  value={proposal.rightsNotice}
+                  onChange={(event) =>
+                    edit({ rightsNotice: event.target.value })
+                  }
+                />
+              </div>
             </div>
             <div className="mt-5 flex flex-wrap justify-between gap-3">
-              <button
-                type="button"
-                className="inline-flex items-center justify-center rounded-lg border border-white/15 bg-transparent px-5 py-3 text-xs font-bold text-white/60"
-                disabled
-              >
-                Upload pitch and poster
-              </button>
+              <span className="text-xs text-white/60">
+                {proposalIssue(proposal) ?? "Proposal ready."}
+              </span>
               <button
                 className="inline-flex items-center justify-center rounded-lg border border-[#d3ed05] bg-[#d3ed05] px-5 py-3 text-xs font-bold text-black transition hover:border-[#e4ff1a] hover:bg-[#e4ff1a]"
                 type="button"
@@ -123,7 +188,7 @@ export function CreateWorkspace() {
                 Define how funding and eligible receipts work for your film.
               </p>
             </div>
-            <FinanceTermsForm reviewer={reviewer} />
+            <FinanceTermsForm reviewer={reviewer} proposal={proposal} />
             <button
               type="button"
               className="hover:text-[#e4ff1a] mt-[18px] cursor-pointer border-0 bg-transparent text-xs font-bold text-[#d3ed05]"

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/shell/app-shell";
 import { WalletDashboard } from "@/components/dashboard/wallet-dashboard";
+import { ListingsManager } from "@/components/campaign/listings-manager";
 
 export default function CreatorDashboard() {
   return (
@@ -21,6 +22,7 @@ export default function CreatorDashboard() {
         </Link>
       </div>
       <WalletDashboard mode="creator" />
+      <ListingsManager />
     </AppShell>
   );
 }

@@ -1,10 +1,11 @@
 "use client";
 import CountUp from "../custom/Countup";
 import NFTcard from "../custom/NFTcard"
-import heroninja from "../../../../public/landing/HeroNinja.svg"
+import heroCharacter from "../../../../public/landing/hero-character.png"
 import grassImage from '../../../../public/landing/grass.png'
 import { motion, useScroll, useSpring, useTransform } from "motion/react";
 import { useRef } from "react";
+import Link from "next/link";
 
 const Hero = () => {
     const sectionRef = useRef(null);
@@ -37,10 +38,9 @@ const Hero = () => {
                             pay-per-view settlement. Follow a story from campaign terms to the final frame.
                         </span>
                     </p>
-                    <button className='bg-[#d3ed05] text-black px-5 py-3 rounded-lg font-bold tracking-tight
-                    '>
+                    <Link href="/discover" className='bg-[#d3ed05] text-black px-5 py-3 rounded-lg font-bold tracking-tight'>
                         Explore all films
-                    </button>
+                    </Link>
                 </div>
 
                 {/* Cards container */}
@@ -105,9 +105,9 @@ const Hero = () => {
             {/* Hero Ninja Image */}
             <div className="flex justify-center px-4 mt-8 xl:absolute xl:left-1/2 xl:-translate-x-1/2 xl:-bottom-30 xl:mt-10 pt-20 xl:z-10">
                 <motion.img
-                    src={heroninja.src}
-                    alt="HeroNinja"
-                    className="w-full h-auto max-w-full sm:max-w-[500px] md:max-w-[600px] lg:max-w-[719px]"
+                    src={heroCharacter.src}
+                    alt="Cinevest cinema-camera mascot"
+                    className="h-[clamp(380px,48vw,600px)] w-auto max-w-full"
                     style={{
                         translateY
                     }}

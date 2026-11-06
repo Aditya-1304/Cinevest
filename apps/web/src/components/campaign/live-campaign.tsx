@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { WalletConnect } from "@/components/wallet/wallet-connect";
 import { AddressLink } from "./address-link";
+import { FilmStory } from "./film-story";
 import { CampaignBoundary } from "./campaign-boundary";
 import { CampaignActions } from "./campaign-actions";
 import { MilestonePanel } from "./milestone-panel";
@@ -39,6 +40,7 @@ export function LiveCampaign({ campaign }: { campaign: Address }) {
   return (
     <CampaignBoundary>
       <div className="w-full space-y-3">
+        <FilmStory campaign={campaign} />
         <Card className="overflow-hidden border-white/10 bg-[#04141C] shadow-[0_18px_60px_rgba(0,0,0,.3)]">
           <CardHeader className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-white/5 bg-white/[.02] px-5 py-4">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
