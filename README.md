@@ -17,8 +17,8 @@ Web: http://localhost:3000. Backend: http://localhost:3001. The web app proxies 
 
 ## Workspace
 
-- `apps/web`: Next.js App Router, Tailwind CSS 4, shadcn-compatible UI, wagmi/viem and World IDKit dependencies. Add components with `npx shadcn@latest add <component>` from this directory.
-- `apps/backend`: Next.js route handlers; Arkiv SDK, SIWE, JOSE and Postgres dependencies. Livepeer and Bee integrations can use server-side fetch.
+- `apps/web`: Next.js App Router, Tailwind CSS 4, shadcn-compatible UI, wagmi/viem and the CRE release-review UI. Add components with `npx shadcn@latest add <component>` from this directory.
+- `apps/backend`: Next.js route handlers; Arkiv SDK, SIWE, JOSE and Postgres dependencies. Mux and Bee integrations use server-side credentials.
 - `contracts`: Foundry configuration. Create the Arc Studio starting project before importing contracts here, as required by the spec. Install Foundry separately, then use `npm run contracts:build` and `npm run contracts:test`.
 - `packages/abi`: reserved for generated contract ABIs; no fabricated contract interface.
 - `arkiv`: reserved for schema and integration evidence.
@@ -29,9 +29,16 @@ The governing build plan and per-phase evidence describe the implemented capabil
 
 Before publishing, choose a license, review the specification and add required hackathon AI-use disclosures. Git initialization, commits, pushes and deployment remain user-controlled.
 
-## World ID fair funding
+## Chainlink CRE + Mux release review
 
-Phase 9 code now includes server-side proof verification, durable EIP-712 funding
-permissions and the gated contribution UI. See [implementation and activation](docs/world/phase-9-completion.md)
-and the [World integration debrief](docs/world/debrief.md). Live World proof and
-matching-deployment acceptance remain outstanding; incompatible funding is disabled.
+The active sponsor integration is Arc + Arkiv + Chainlink. CRE reads Arc campaign
+state, queries Mux directly and previews final milestone approval before the human
+reviewer signs. The UI exposes a redacted simulation report; no production-oracle
+or proof-of-humanity claim is made.
+
+See [CRE setup and trust boundaries](docs/cre.md). Run `npm ci --prefix cre`,
+`npm run cre:build`, configure the private runner environment, then run
+`npm run cre:runner` alongside `npm run dev`.
+
+World verification endpoints are retired. Existing World-gated contracts retain
+their immutable restrictions; new campaigns use public funding.

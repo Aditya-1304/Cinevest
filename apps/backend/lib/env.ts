@@ -38,6 +38,8 @@ export const serverEnvSchema = z.object({
   MUX_TOKEN_SECRET: optionalText,
   MUX_SIGNING_KEY_ID: optionalText,
   MUX_SIGNING_PRIVATE_KEY: optionalText,
+  CRE_RUNNER_URL: optionalUrl,
+  CRE_RUNNER_SECRET: optionalSecret,
   WORLD_RP_ID: optionalText,
   WORLD_RP_SIGNING_KEY: optionalText,
   WORLD_APP_ID: optionalText,

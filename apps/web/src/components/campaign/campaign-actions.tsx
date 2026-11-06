@@ -24,7 +24,6 @@ import { ARC_TESTNET, type CampaignTerms } from "@/lib/chain";
 import { formatUsdc } from "@/lib/format";
 import { campaignAbi, worldAuthorizationData, worldAuthorizationDigest, type WorldAuthorizationGrant } from "@cinevest/abi";
 import { ARC_TESTNET_DEPLOYMENT } from "@/lib/chain";
-import { WorldChallenge } from "@/components/world/world-challenge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TxStatus } from "@/components/ui/tx-status";
@@ -414,8 +413,7 @@ export function CampaignActions({
               onChange={(e) => setAmount(e.target.value)}
               className="min-h-11 w-full rounded-md border border-white/15 bg-[#072733] px-3 text-white"
             />
-            {requiresWorld && <WorldChallenge key={`${campaign}:${address}`} campaign={campaign}
-              embedded disabled={!ready || deadlinePassed} onAuthorized={setWorldGrant} />}
+
             <Button
               disabled={!canFund}
               onClick={() => void transact("contribute")}
@@ -425,7 +423,7 @@ export function CampaignActions({
             {requiresWorld && (
               <p>
                 {worldReady ? "World ID permission ready. The contract enforces your cumulative human limit."
-                  : "Funding is locked. Verify with World ID, or request a fresh proof if your permission expired."}
+                  : "This legacy campaign has an immutable World gate. World verification is retired; use a new campaign with public funding."}
               </p>
             )}
             {deadlinePassed && (
