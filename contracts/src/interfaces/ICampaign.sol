@@ -35,6 +35,14 @@ interface ICampaign {
     /// @notice Contributes USDC principal while funding is open; World-gated campaigns require authorization.
     function contribute(uint256 amount) external;
 
+    /// @notice Gated funding consumes a wallet-bound EIP-712 permission and applies the cumulative human cap.
+    function contributeWithAuthorization(uint256 amount, CampaignTypes.WorldAuthorization calldata authorization, bytes calldata signature) external;
+    function worldAuthorizationDigest(CampaignTypes.WorldAuthorization calldata authorization) external view returns (bytes32);
+    function worldVerifierSigner() external view returns (address);
+    function usedWorldAuthorizations(bytes32 digest) external view returns (bool);
+    function nullifierOwner(bytes32 nullifierHash) external view returns (address);
+    function humanContribution(bytes32 nullifierHash) external view returns (uint256);
+
     /// @notice Moves a goal-reached campaign to Production; callable by anyone.
     function finalize() external;
 

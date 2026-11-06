@@ -25,6 +25,13 @@ Web: http://localhost:3000. Backend: http://localhost:3001. The web app proxies 
 
 `npm run typecheck`, `npm run lint`, and `npm run build` validate the TypeScript applications.
 
-Only scaffolding is implemented: wallet providers, database schema, contracts, authentication, funding, storage, identity verification and streaming remain to be built. Health reports process availability only. Keep private credentials server-side. Never commit `.env.local`.
+The governing build plan and per-phase evidence describe the implemented capabilities and remaining live acceptance. Health reports process availability only. Keep private credentials server-side. Never commit `.env.local`.
 
 Before publishing, choose a license, review the specification and add required hackathon AI-use disclosures. Git initialization, commits, pushes and deployment remain user-controlled.
+
+## World ID fair funding
+
+Phase 9 code now includes server-side proof verification, durable EIP-712 funding
+permissions and the gated contribution UI. See [implementation and activation](docs/world/phase-9-completion.md)
+and the [World integration debrief](docs/world/debrief.md). Live World proof and
+matching-deployment acceptance remain outstanding; incompatible funding is disabled.

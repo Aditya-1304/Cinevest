@@ -4,17 +4,29 @@ pragma solidity 0.8.28;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { CampaignTypes } from "./CampaignTypes.sol";
 import { ICampaignEvents } from "./interfaces/ICampaign.sol";
 
 /// @notice Per-film campaign exposing immutable terms and the lifecycle stage.
 /// @dev Arc owns financial authority; playback hashes commit an asset identifier, not provider availability.
-contract Campaign is ICampaignEvents, ReentrancyGuard {
+contract Campaign is ICampaignEvents, ReentrancyGuard, EIP712 {
     /// @dev Milestone release schedule is fixed at three cumulative 40/70/100 percent steps of the goal.
     uint256 private constant MAX_TRANCHE_INDEX = 2;
     /// @notice After this fixed grace period anyone may recover unspent escrow if the reviewer disappears.
     uint256 public constant CANCELLATION_GRACE_PERIOD = 7 days;
+
+    /// @notice Captured at creation; an authorization cannot be moved between campaigns or chains.
+    address public immutable worldVerifierSigner;
+    bytes32 public constant WORLD_AUTHORIZATION_TYPEHASH = keccak256(
+        "WorldAuthorization(address wallet,address campaign,bytes32 scopedNullifierHash,bytes32 nonce,uint256 deadline)"
+    );
+    mapping(bytes32 digest => bool consumed) public usedWorldAuthorizations;
+    mapping(bytes32 nullifierHash => address wallet) public nullifierOwner;
+    /// @notice Lifetime principal per human; refunds never reopen the funding cap.
+    mapping(bytes32 nullifierHash => uint256 principal) public humanContribution;
 
     CampaignTypes.CampaignTerms private _terms;
     CampaignTypes.Stage private _stage;
@@ -50,24 +62,66 @@ contract Campaign is ICampaignEvents, ReentrancyGuard {
     uint256 public releasedAt;
     bytes32 public livepeerPlaybackIdHash;
 
-    constructor(CampaignTypes.CampaignTerms memory terms) {
+    constructor(CampaignTypes.CampaignTerms memory terms, address verifierSigner)
+        EIP712("CinevestWorldAuthorization", "1")
+    {
         CampaignTypes.validateTerms(terms);
+        if (terms.worldGated && verifierSigner == address(0)) revert CampaignTypes.WorldVerifierRequired();
+        worldVerifierSigner = verifierSigner;
         _terms = terms;
         _stage = CampaignTypes.Stage.Funding;
     }
 
-    /// @notice Accepts a USDC principal contribution while funding is open and below the goal.
-    /// @dev Checks, then records state, then pulls USDC, so a failed pull leaves no accounting behind.
-    ///      World-gated campaigns stay fail-closed until the Phase 9 attestation verifier exists; there is
-    ///      deliberately no permissionless path through the gate.
+    /// @notice Permissionless funding is available only to campaigns that do not require World ID.
     function contribute(uint256 amount) external nonReentrant {
+        if (_terms.worldGated) revert CampaignTypes.WorldAuthorizationRequired();
+        _contribute(amount);
+    }
+
+    /// @notice Accepts gated funding with a one-use permission issued after backend World verification.
+    /// @dev The same transaction consumes the permission, binds the human and pulls principal;
+    ///      any lifecycle, cap or token-transfer failure rolls all three changes back.
+    function contributeWithAuthorization(
+        uint256 amount, CampaignTypes.WorldAuthorization calldata authorization, bytes calldata signature
+    ) external nonReentrant {
+        if (!_terms.worldGated) revert CampaignTypes.WorldGateNotEnabled();
+        if (authorization.wallet != msg.sender || authorization.campaign != address(this)
+            || authorization.scopedNullifierHash == bytes32(0) || authorization.nonce == bytes32(0)) {
+            revert CampaignTypes.InvalidWorldAuthorization();
+        }
+        if (block.timestamp > authorization.deadline) revert CampaignTypes.WorldAuthorizationExpired();
+        bytes32 digest = worldAuthorizationDigest(authorization);
+        if (usedWorldAuthorizations[digest]) revert CampaignTypes.WorldAuthorizationUsed();
+        (address signer, ECDSA.RecoverError error,) = ECDSA.tryRecoverCalldata(digest, signature);
+        if (error != ECDSA.RecoverError.NoError || signer != worldVerifierSigner) {
+            revert CampaignTypes.InvalidWorldAuthorization();
+        }
+        bytes32 nullifier = authorization.scopedNullifierHash;
+        address owner = nullifierOwner[nullifier];
+        if (owner != address(0) && owner != msg.sender) revert CampaignTypes.WorldNullifierOwned();
+        uint256 funded = humanContribution[nullifier];
+        if (amount > _terms.perHumanLimit - funded) revert CampaignTypes.PerHumanLimitExceeded();
+        usedWorldAuthorizations[digest] = true;
+        nullifierOwner[nullifier] = msg.sender;
+        humanContribution[nullifier] = funded + amount;
+        if (owner == address(0)) emit ProofVerified(nullifier, msg.sender);
+        _contribute(amount);
+    }
+
+    /// @notice Returns the exact EIP-712 digest used by the backend encoder and replay guard.
+    function worldAuthorizationDigest(CampaignTypes.WorldAuthorization calldata authorization) public view returns (bytes32) {
+        return _hashTypedDataV4(keccak256(abi.encode(
+            WORLD_AUTHORIZATION_TYPEHASH, authorization.wallet, authorization.campaign,
+            authorization.scopedNullifierHash, authorization.nonce, authorization.deadline
+        )));
+    }
+
+    /// @dev Both external funding routes share lifecycle, goal, accounting and transfer behavior.
+    function _contribute(uint256 amount) private {
         if (amount == 0) revert CampaignTypes.ZeroContribution();
         if (_stage != CampaignTypes.Stage.Funding) revert CampaignTypes.FundingStageEnded();
-        if (block.timestamp >= _terms.fundingDeadline) {
-            revert CampaignTypes.FundingDeadlinePassed();
-        }
-        if (_terms.worldGated) revert CampaignTypes.WorldGateUnenforced();
-        uint256 remaining = _terms.fundingGoal - _raised; // raised is always <= goal, so this is safe
+        if (block.timestamp >= _terms.fundingDeadline) revert CampaignTypes.FundingDeadlinePassed();
+        uint256 remaining = _terms.fundingGoal - _raised;
         if (amount > remaining) revert CampaignTypes.ContributionOverRemaining(amount, remaining);
         _raised += amount;
         _units[msg.sender] += amount;

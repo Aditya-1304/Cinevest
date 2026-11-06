@@ -52,6 +52,19 @@ export const campaignFactoryAbi = [
   },
   {
     "type": "function",
+    "name": "configureWorldVerifierSigner",
+    "inputs": [
+      {
+        "name": "signer",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "createCampaign",
     "inputs": [
       {
@@ -156,6 +169,32 @@ export const campaignFactoryAbi = [
     "stateMutability": "view"
   },
   {
+    "type": "function",
+    "name": "worldVerifierAdmin",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "worldVerifierSigner",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "type": "event",
     "name": "CampaignCreated",
     "inputs": [
@@ -167,6 +206,19 @@ export const campaignFactoryAbi = [
       },
       {
         "name": "campaign",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "WorldVerifierConfigured",
+    "inputs": [
+      {
+        "name": "signer",
         "type": "address",
         "indexed": true,
         "internalType": "address"
@@ -205,5 +257,20 @@ export const campaignFactoryAbi = [
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "WorldVerifierAdminOnly",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WorldVerifierAlreadyConfigured",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WorldVerifierRequired",
+    "inputs": []
   }
 ] as const;
