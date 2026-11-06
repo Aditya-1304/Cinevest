@@ -6,6 +6,7 @@ import {
   useBlock,
   usePublicClient,
   useReadContracts,
+  useReadContract,
   useSwitchChain,
   useWriteContract,
 } from "wagmi";
@@ -50,6 +51,12 @@ export function CampaignActions({
   const [amount, setAmount] = useState("");
   const [worldGrant, setWorldGrant] = useState<WorldAuthorizationGrant>();
   const flow = useTxFlow();
+  const publicRound = useReadContract({
+    address: campaign, abi: campaignAbi, functionName: "publicFundingOpen",
+    chainId: ARC_TESTNET.id, query: { refetchInterval: 15_000 },
+  });
+  // Older campaigns lack this extension; a failed read preserves their original World gate.
+  const requiresWorld = terms.worldGated && publicRound.data !== true;
   const reads = useReadContracts({
     contracts: [
       {
@@ -223,7 +230,7 @@ export function CampaignActions({
   const canFund =
     ready &&
     stage === 0 &&
-    (!terms.worldGated || worldReady) &&
+    (!requiresWorld || worldReady) &&
     units > 0n &&
     raised !== undefined &&
     units <= terms.fundingGoal - raised &&
@@ -263,7 +270,7 @@ export function CampaignActions({
           BigInt(Math.floor(Date.now() / 1000)) >= terms.fundingDeadline
         )
           throw new Error("Funding is closed or the amount is invalid.");
-        if (terms.worldGated) {
+        if (requiresWorld) {
           if (!worldGrant || !worldReady) throw new Error("Verify with World ID before funding.");
           const authorization = { ...worldGrant.authorization, deadline: BigInt(worldGrant.authorization.deadline) };
           const signer = await client.readContract({ address: campaign, abi: campaignAbi, functionName: "worldVerifierSigner" });
@@ -309,12 +316,12 @@ export function CampaignActions({
       }
       let tx: Hash;
       if (action === "contribute") {
-        if (terms.worldGated && (!worldGrant || !worldReady
+        if (requiresWorld && (!worldGrant || !worldReady
             || BigInt(worldGrant.authorization.deadline) <= BigInt(Math.floor(Date.now() / 1000)))) {
           setWorldGrant(undefined);
           throw new Error("World funding permission expired. Verify again.");
         }
-        if (terms.worldGated && worldGrant) {
+        if (requiresWorld && worldGrant) {
           const simulation = await client.simulateContract({ address: campaign, abi: campaignAbi, functionName: "contributeWithAuthorization",
             args: [units, { ...worldGrant.authorization, deadline: BigInt(worldGrant.authorization.deadline) }, worldGrant.signature], account: address });
           tx = await writer.writeContractAsync({ ...simulation.request, chainId: ARC_TESTNET.id });
@@ -407,7 +414,7 @@ export function CampaignActions({
               onChange={(e) => setAmount(e.target.value)}
               className="min-h-11 w-full rounded-md border border-white/15 bg-[#072733] px-3 text-white"
             />
-            {terms.worldGated && <WorldChallenge key={`${campaign}:${address}`} campaign={campaign}
+            {requiresWorld && <WorldChallenge key={`${campaign}:${address}`} campaign={campaign}
               embedded disabled={!ready || deadlinePassed} onAuthorized={setWorldGrant} />}
             <Button
               disabled={!canFund}
@@ -415,7 +422,7 @@ export function CampaignActions({
             >
               {flow.busy ? "Transaction pending…" : "Approve and contribute"}
             </Button>
-            {terms.worldGated && (
+            {requiresWorld && (
               <p>
                 {worldReady ? "World ID permission ready. The contract enforces your cumulative human limit."
                   : "Funding is locked. Verify with World ID, or request a fresh proof if your permission expired."}

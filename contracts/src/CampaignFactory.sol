@@ -53,6 +53,19 @@ contract CampaignFactory {
         emit CampaignCreated(terms.creator, campaign);
     }
 
+    /// @notice Creates a World-gated campaign that opens public funding after N unique humans contribute.
+    function createCampaignWithVerifiedRound(CampaignTypes.CampaignTerms calldata terms, uint256 target)
+        external returns (address campaign)
+    {
+        if (msg.sender != terms.creator) revert CampaignTypes.CreatorOnly();
+        Campaign deployed = new Campaign(terms, worldVerifierSigner);
+        deployed.configureVerifiedFirstRound(target);
+        campaign = address(deployed);
+        _isCampaign[campaign] = true;
+        _campaigns.push(campaign);
+        emit CampaignCreated(terms.creator, campaign);
+    }
+
     /// @notice Confirms that an address was created by this factory; unknown addresses report false.
     function isCampaign(address campaign) external view returns (bool) {
         return _isCampaign[campaign];

@@ -151,6 +151,97 @@ export const campaignFactoryAbi = [
   },
   {
     "type": "function",
+    "name": "createCampaignWithVerifiedRound",
+    "inputs": [
+      {
+        "name": "terms",
+        "type": "tuple",
+        "internalType": "struct CampaignTypes.CampaignTerms",
+        "components": [
+          {
+            "name": "creator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "reviewer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "usdc",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "fundingGoal",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "fundingDeadline",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "productionDeadline",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "rightsDuration",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "watchPrice",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "funderBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "repaymentCapBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "pitchReference",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "worldGated",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "perHumanLimit",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "name": "target",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "campaign",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "isCampaign",
     "inputs": [
       {

@@ -43,6 +43,17 @@ interface ICampaign {
     function nullifierOwner(bytes32 nullifierHash) external view returns (address);
     function humanContribution(bytes32 nullifierHash) external view returns (uint256);
 
+    /// @notice Extension state for campaigns whose World gate opens after a fixed number of humans.
+    function publicFundingOpen() external view returns (bool);
+    function verifiedFirstRoundTarget() external view returns (uint256);
+    function verifiedHumanCount() external view returns (uint256);
+
+    /// @notice Reviewer approval commits to independently reviewed offchain sponsor conditions.
+    function approveSponsor(bytes32 approvalId, address sponsor, uint256 amount, bytes32 conditionsHash, bool approved) external;
+
+    /// @notice Pulls approved sponsor USDC into the same waterfall as paid viewing without granting access.
+    function depositSponsor(bytes32 approvalId, uint256 amount, bytes32 conditionsHash) external;
+
     /// @notice Moves a goal-reached campaign to Production; callable by anyone.
     function finalize() external;
 
