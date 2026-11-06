@@ -10,7 +10,8 @@ type Upload = typeof mediaUploads.$inferSelect;
 type Identity = { arcChainId: string; campaignAddress: string; ownerWallet: string; attemptKey: string };
 
 export class UploadError extends Error {
-  constructor(readonly status: number, message: string) { super(message); }
+  status: number;
+  constructor(status: number, message: string) { super(message); this.status = status; }
 }
 
 /**

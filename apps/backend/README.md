@@ -223,3 +223,19 @@ Rebuild/restart the backend after a new deployment so it imports the new manifes
 - **Verification status:** the token format was checked against the official SDK's output and the probe logic against a
   fake provider that verifies tokens. No real Livepeer asset has been probed yet (no API key in this checkout), so
   Livepeer's actual playback-info shape and JWT delivery behavior still need one live run.
+
+## Player and negative tests (Phase 8.10–8.11)
+
+- **Player:** `apps/web` renders `ProtectedPlayer` on `/watch/:chainId/:campaign` (`@livepeer/react`). It runs
+  wallet connect, SIWE sign-in (`useSession`), `POST /api/playback/authorize`, then plays with the returned `jwt`.
+  Explicit states: sign-in required, authorizing, denied (not purchased / not released), unavailable with Retry, and
+  an in-player interruption Retry. The token is renewed before `refreshAt`; a failed renewal retries every 15 s while
+  the current token is valid. Purchasing access is not on this page (that is a later phase).
+- **Tests:** `lib/media/playback.test.mjs` drives the real route handlers against an in-memory PostgreSQL with only
+  Arc RPC and Livepeer faked. It covers guest, forged/tampered session, foreign origin, wrong chain/campaign,
+  another wallet, client-supplied hash/wallet, unpublished film, DB/Arc hash mismatch, SIWE replay/foreign
+  domain/wrong chain/stale message (`I18`), and the failure matrix: Arc outage fails every route closed, a lost upload
+  response resumes the same attempt, a provider timeout never regresses status, oversized assets fail, duplicate
+  callbacks converge on one `ready`, and asset deletion, policy reset or a changed playback ID fails the final-review gate.
+- **Not covered offline:** real Livepeer delivery behavior and the browser player with a live token need one run with
+  `LIVEPEER_API_KEY` and a signing key; `probePlayback` is the tool for that run.
