@@ -4,10 +4,11 @@ import {
   useAccount,
   usePublicClient,
   useReadContracts,
+  useSignMessage,
   useSwitchChain,
   useWriteContract,
 } from "wagmi";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   zeroHash,
   zeroAddress,
@@ -20,6 +21,66 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TxStatus } from "@/components/ui/tx-status";
 import { useTxFlow } from "@/lib/use-tx-flow";
+import { signedPost } from "@/lib/publication-client";
+import { posterUrl } from "@/lib/market";
+import { MAX_POSTER_UI_BYTES, POSTER_TYPES, posterPayload } from "@/lib/proposal";
+
+const MAX_EVIDENCE_FILES = 3;
+
+type EvidenceManifest = { text: string; evidenceFiles: string[]; submittedAt: number };
+
+/** Public evidence, fetched through the backend, which checks it against the Arc commitment. */
+function EvidenceView({
+  campaign,
+  index,
+  reference,
+}: {
+  campaign: Address;
+  index: number;
+  reference: Hex;
+}) {
+  const manifest = useQuery({
+    queryKey: ["evidence", campaign, index, reference],
+    queryFn: async () => {
+      const response = await fetch(
+        `/api/swarm/${reference}?kind=milestone&campaign=${campaign}&index=${index}`,
+        { cache: "no-store" },
+      );
+      if (!response.ok) throw new Error("unverified");
+      return ((await response.json()) as { manifest: EvidenceManifest }).manifest;
+    },
+  });
+  if (manifest.isPending)
+    return <p className="text-xs text-white/60">Verifying evidence from Swarm…</p>;
+  if (manifest.isError)
+    return (
+      <p role="alert" className="text-xs text-amber-300">
+        The evidence could not be verified from Swarm right now.{" "}
+        <button type="button" className="underline" onClick={() => void manifest.refetch()}>
+          Try again
+        </button>
+      </p>
+    );
+  return (
+    <div className="space-y-2 rounded-lg border border-white/10 p-3">
+      <p className="text-xs text-[#d3ed05]">Verified against the Arc commitment</p>
+      <p className="text-sm whitespace-pre-wrap text-white/80">{manifest.data.text}</p>
+      <div className="flex flex-wrap gap-2">
+        {manifest.data.evidenceFiles.map((file) => (
+          // Verified Swarm bytes served by the backend; next/image cannot optimize this URL.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={file}
+            src={posterUrl(file)}
+            alt="Evidence"
+            loading="lazy"
+            className="h-24 w-auto rounded-md bg-[#072733] object-cover"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function MilestonePanel({
   campaign,
@@ -32,6 +93,10 @@ export function MilestonePanel({
 }) {
   const [index, setIndex] = useState(1);
   const [reference, setReference] = useState("");
+  const [evidenceText, setEvidenceText] = useState("");
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
+  const [upload, setUpload] = useState({ busy: false, message: "" });
+  const { signMessageAsync } = useSignMessage();
   const [toastOpen, setToastOpen] = useState(false);
   const flow = useTxFlow();
   const { address, chainId } = useAccount();
@@ -62,12 +127,47 @@ export function MilestonePanel({
         args: [address ?? zeroAddress],
         chainId: ARC_TESTNET.id,
       },
+      {
+        address: campaign,
+        abi: campaignAbi,
+        functionName: "approvedTrancheAmount",
+        chainId: ARC_TESTNET.id,
+      },
+      {
+        address: campaign,
+        abi: campaignAbi,
+        functionName: "trancheAmounts",
+        chainId: ARC_TESTNET.id,
+      },
+      {
+        address: campaign,
+        abi: campaignAbi,
+        functionName: "livepeerPlaybackIdHash",
+        chainId: ARC_TESTNET.id,
+      },
     ],
     query: { refetchInterval: 15_000 },
   });
   const evidence = reads.data?.[0].result;
   const dispute = reads.data?.[1].result;
   const contribution = reads.data?.[2].result;
+  const approvedAmount = reads.data?.[3].result as bigint | undefined;
+  const tranches = reads.data?.[4].result as readonly bigint[] | undefined;
+  const playbackHash = reads.data?.[5].result as Hex | undefined;
+  // Final delivery (index 2) opens only after the rough cut is approved and a release is configured.
+  const roughCutApproved =
+    approvedAmount !== undefined &&
+    tranches !== undefined &&
+    approvedAmount >= tranches[0] + tranches[1];
+  const releaseConfigured = !!playbackHash && playbackHash !== zeroHash;
+  const finalBlockedMessage =
+    index !== 2
+      ? undefined
+      : !roughCutApproved
+        ? "Approve the rough cut first: the final delivery opens only after that approval."
+        : !releaseConfigured
+          ? "Final approval also needs a configured film release, which arrives with the Livepeer step."
+          : undefined;
   const readsFailed =
     reads.isError || reads.data?.some((read) => read.status === "failure");
   const ready =
@@ -80,6 +180,52 @@ export function MilestonePanel({
     dispute !== undefined;
   const creator = address?.toLowerCase() === terms.creator.toLowerCase();
   const reviewer = address?.toLowerCase() === terms.reviewer.toLowerCase();
+
+  /** Uploads each image, then the signed milestone manifest; the result becomes the evidence reference. */
+  async function uploadEvidence() {
+    if (!address || upload.busy) return;
+    const sign = (text: string) => signMessageAsync({ message: text });
+    setUpload({ busy: true, message: "Sign to upload the evidence images…" });
+    try {
+      const refs: string[] = [];
+      for (const file of evidenceFiles) {
+        const res = await signedPost<{ reference?: string; error?: string }>(
+          "/api/artifacts",
+          { action: "artifact-upload", actor: address, kind: "poster", payload: await posterPayload(file) },
+          sign,
+        );
+        if (!res.ok || !res.data.reference)
+          throw new Error(res.data.error ?? "An evidence image could not be uploaded.");
+        refs.push(res.data.reference);
+      }
+      setUpload({ busy: true, message: "Sign to publish the milestone manifest…" });
+      const manifest = await signedPost<{ reference?: string; error?: string }>(
+        "/api/artifacts",
+        {
+          action: "artifact-upload",
+          actor: address,
+          kind: "milestone",
+          payload: {
+            campaignAddress: campaign,
+            milestoneIndex: index,
+            evidenceFiles: refs,
+            submittedAt: Math.floor(Date.now() / 1000),
+            text: evidenceText.trim(),
+          },
+        },
+        sign,
+      );
+      if (!manifest.ok || !manifest.data.reference)
+        throw new Error("The evidence manifest was refused. Only the campaign creator can publish it during Production.");
+      setReference(manifest.data.reference);
+      setUpload({ busy: false, message: `Evidence published. Reference: ${manifest.data.reference}` });
+    } catch (cause) {
+      setUpload({
+        busy: false,
+        message: cause instanceof Error ? cause.message : "Evidence upload failed.",
+      });
+    }
+  }
 
   async function act(
     action: "submitEvidence" | "approveStage" | "disputeStage" | "resolveStage",
@@ -166,6 +312,9 @@ export function MilestonePanel({
           <p className="text-sm break-all">
             Evidence: {evidence ?? "Loading…"}
           </p>
+          {evidence && evidence !== zeroHash && (
+            <EvidenceView campaign={campaign} index={index} reference={evidence} />
+          )}
           <p>
             Review:{" "}
             {dispute === undefined
@@ -222,7 +371,55 @@ export function MilestonePanel({
             </p>
           )}
           {creator && (
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-lg border border-white/10 p-3">
+              <p className="text-sm font-bold text-white">Publish evidence to Swarm</p>
+              <label htmlFor="evidence-text" className="block text-xs">
+                What was delivered
+              </label>
+              <textarea
+                id="evidence-text"
+                rows={3}
+                className="w-full rounded-md border border-white/15 bg-[#072733] px-3 py-2 text-white"
+                value={evidenceText}
+                onChange={(event) => setEvidenceText(event.target.value)}
+              />
+              <label htmlFor="evidence-files" className="block text-xs">
+                Evidence images (1 to {MAX_EVIDENCE_FILES}; JPEG, PNG, WebP or GIF, up to 1 MiB each)
+              </label>
+              <input
+                id="evidence-files"
+                type="file"
+                multiple
+                accept={POSTER_TYPES.join(",")}
+                className="w-full text-xs"
+                onChange={(event) =>
+                  setEvidenceFiles(Array.from(event.target.files ?? []))
+                }
+              />
+              <Button
+                type="button"
+                disabled={
+                  !address ||
+                  upload.busy ||
+                  stage !== 2 ||
+                  !evidenceText.trim() ||
+                  evidenceFiles.length < 1 ||
+                  evidenceFiles.length > MAX_EVIDENCE_FILES ||
+                  evidenceFiles.some(
+                    (file) =>
+                      !POSTER_TYPES.includes(file.type) ||
+                      file.size > MAX_POSTER_UI_BYTES,
+                  )
+                }
+                onClick={() => void uploadEvidence()}
+              >
+                {upload.busy ? "Uploading…" : "Upload evidence to Swarm"}
+              </Button>
+              {upload.message && (
+                <p role="status" aria-live="polite" className="text-xs break-all">
+                  {upload.message}
+                </p>
+              )}
               <label htmlFor="evidence-reference" className="block text-sm">
                 Swarm evidence reference (0x plus 64 hex characters)
               </label>
@@ -245,6 +442,9 @@ export function MilestonePanel({
               </Button>
             </div>
           )}
+          {reviewer && finalBlockedMessage && (
+            <p className="text-xs text-amber-300">{finalBlockedMessage}</p>
+          )}
           <div className="flex flex-wrap gap-3">
             {reviewer && (
               <>
@@ -253,7 +453,8 @@ export function MilestonePanel({
                     !ready ||
                     !evidence ||
                     evidence === zeroHash ||
-                    dispute === 1
+                    dispute === 1 ||
+                    !!finalBlockedMessage
                   }
                   onClick={() => void act("approveStage")}
                 >

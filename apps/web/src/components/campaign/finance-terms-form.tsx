@@ -2,24 +2,14 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useAccount, usePublicClient, useSwitchChain, useWriteContract } from "wagmi";
-import {
-  decodeEventLog,
-  isAddress,
-  parseUnits,
-  zeroAddress,
-  zeroHash,
-} from "viem";
-import {
-  ARC_TESTNET,
-  ARC_TESTNET_DEPLOYMENT,
-  ARC_TESTNET_USDC,
-} from "@/lib/chain";
-import { campaignFactoryAbi } from "@cinevest/abi";
+import { useAccount, useSwitchChain } from "wagmi";
+import { isAddress, parseUnits, zeroAddress, zeroHash } from "viem";
+import { ARC_TESTNET, ARC_TESTNET_USDC } from "@/lib/chain";
 import { Button } from "@/components/ui/button";
-import { TxStatus } from "@/components/ui/tx-status";
-import { useTxFlow } from "@/lib/use-tx-flow";
 import { filmPath } from "@/lib/paths";
+import { usePublication } from "@/lib/use-publication";
+import { PublicationChecklist } from "./publication-checklist";
+import { posterPayload, proposalIssue, type ProposalDraft } from "@/lib/proposal";
 
 const fields = [
   {
@@ -116,99 +106,74 @@ function validate(values: Values): Partial<Record<FieldName, string>> {
   return errors;
 }
 
-export function FinanceTermsForm({ reviewer }: { reviewer: string }) {
+export function FinanceTermsForm({
+  reviewer,
+  proposal,
+}: {
+  reviewer: string;
+  proposal: ProposalDraft;
+}) {
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [valid, setValid] = useState(false);
-  const [campaign, setCampaign] = useState<string>();
-  const flow = useTxFlow();
-  // Nothing may resubmit while the deployment is mid-flow, unresolved or done.
-  const locked =
-    flow.busy ||
-    flow.state === "uncertain" ||
-    flow.state === "confirmed" ||
-    !!campaign;
+  const [starting, setStarting] = useState(false);
+  const publication = usePublication();
   const { address, chainId } = useAccount();
-  const client = usePublicClient({ chainId: ARC_TESTNET.id });
-  const writer = useWriteContract();
   const switchChain = useSwitchChain();
+  const record = publication.record;
+  const published = !!record?.published;
+  // A record that already holds progress is resumed, never restarted.
+  const hasProgress = !!record && !published;
   const reviewerValid =
     isAddress(reviewer) &&
     reviewer !== zeroAddress &&
     reviewer.toLowerCase() !== address?.toLowerCase();
+  const issue = proposalIssue(proposal);
 
   async function deploy() {
-    const factory = ARC_TESTNET_DEPLOYMENT.factoryAddress;
     const nextErrors = validate(values);
     setErrors(nextErrors);
     if (
-      !factory ||
       !address ||
-      !client ||
       !reviewerValid ||
+      issue ||
       Object.keys(nextErrors).length ||
-      locked
+      publication.running ||
+      starting
     )
       return;
-    // Prompt the wallet to switch before any write when on the wrong network.
-    if (chainId !== ARC_TESTNET.id) {
-      switchChain.switchChain({ chainId: ARC_TESTNET.id });
-      return;
-    }
-    let submitted = false;
-    flow.start("deploy", "Confirm campaign deployment in your wallet.");
+    setStarting(true);
     try {
-      const terms = {
-        creator: address,
-        reviewer: reviewer as `0x${string}`,
-        usdc: ARC_TESTNET_USDC.address,
-        fundingGoal: parseUnits(values.fundingGoal, 6),
-        watchPrice: parseUnits(values.watchPrice, 6),
-        funderBps: Number(values.funderBps),
-        repaymentCapBps: Number(values.repaymentCapBps),
-        fundingDeadline: BigInt(
-          Math.floor(new Date(values.fundingDeadline).getTime() / 1000),
-        ),
-        productionDeadline: BigInt(
-          Math.floor(new Date(values.productionDeadline).getTime() / 1000),
-        ),
-        rightsDuration: BigInt(values.rightsDuration) * 86400n,
-        pitchReference: zeroHash,
-        worldGated: false,
-        perHumanLimit: 0n,
-      };
-      const simulation = await client.simulateContract({
-        address: factory,
-        abi: campaignFactoryAbi,
-        functionName: "createCampaign",
-        args: [terms],
-        account: address,
+      const poster = await posterPayload(proposal.poster!);
+      publication.start({
+        title: proposal.title,
+        genre: proposal.genre,
+        synopsis: proposal.synopsis,
+        rightsNotice: proposal.rightsNotice,
+        poster,
+        terms: {
+          creator: address,
+          reviewer,
+          usdc: ARC_TESTNET_USDC.address,
+          fundingGoal: parseUnits(values.fundingGoal, 6),
+          watchPrice: parseUnits(values.watchPrice, 6),
+          funderBps: Number(values.funderBps),
+          repaymentCapBps: Number(values.repaymentCapBps),
+          fundingDeadline: BigInt(
+            Math.floor(new Date(values.fundingDeadline).getTime() / 1000),
+          ),
+          productionDeadline: BigInt(
+            Math.floor(new Date(values.productionDeadline).getTime() / 1000),
+          ),
+          rightsDuration: BigInt(values.rightsDuration) * 86400n,
+          // Replaced by the Swarm root of the pitch before anything is signed.
+          pitchReference: zeroHash,
+          worldGated: false,
+          perHumanLimit: 0n,
+        },
       });
-      const hash = await writer.writeContractAsync({
-        ...simulation.request,
-        chainId: ARC_TESTNET.id,
-      });
-      submitted = true;
-      await flow.awaitConfirm(hash, async (receipt) => {
-        for (const log of receipt.logs) {
-          if (log.address.toLowerCase() !== factory.toLowerCase()) continue;
-          try {
-            const event = decodeEventLog({
-              abi: campaignFactoryAbi,
-              eventName: "CampaignCreated",
-              data: log.data,
-              topics: log.topics,
-            });
-            setCampaign(event.args.campaign);
-            return "Campaign deployment confirmed.";
-          } catch {
-            /* Other factory logs do not identify the new campaign. */
-          }
-        }
-        return "Deployment confirmed. Check the transaction to locate the new campaign.";
-      });
-    } catch (error) {
-      flow.failed(error, submitted);
+    } finally {
+      setStarting(false);
     }
   }
 
@@ -243,6 +208,7 @@ export function FinanceTermsForm({ reviewer }: { reviewer: string }) {
               value={values[field.name]}
               aria-invalid={!!errors[field.name]}
               aria-describedby={`${field.name}-hint${errors[field.name] ? ` ${field.name}-error` : ""}`}
+              disabled={hasProgress || published}
               onChange={(event) => {
                 setValues({ ...values, [field.name]: event.target.value });
                 setValid(false);
@@ -269,24 +235,26 @@ export function FinanceTermsForm({ reviewer }: { reviewer: string }) {
       </button>
       {valid && (
         <p role="status">
-          Finance fields are valid. Review the immutable terms before deploying.
+          Finance fields are valid. Review the immutable terms before publishing.
         </p>
       )}
       <p className="mt-1">
-        This creates an ungated campaign without a Swarm pitch reference.
-        Proposal text and uploads are not published yet.
+        Publishing uploads your poster and pitch to Swarm, deploys the campaign
+        on Arc Testnet and lists it on Arkiv. You will be asked to sign several
+        messages and two transactions.
       </p>
       {!reviewerValid && (
         <p role="status">
           Add a valid independent reviewer wallet in the proposal step.
         </p>
       )}
+      {issue && !hasProgress && <p role="status">{issue}</p>}
       {(!address || chainId !== ARC_TESTNET.id) && (
         <div className="mt-1 space-y-2">
           <p>
             {address
-              ? "Switch to Arc Testnet to deploy."
-              : "Connect your wallet on Arc Testnet to deploy."}
+              ? "Switch to Arc Testnet to publish."
+              : "Connect your wallet on Arc Testnet to publish."}
           </p>
           {address && chainId !== ARC_TESTNET.id && (
             <Button
@@ -301,31 +269,63 @@ export function FinanceTermsForm({ reviewer }: { reviewer: string }) {
           )}
         </div>
       )}
-      <Button
-        className="mt-2 h-9 min-h-9 text-xs"
-        disabled={
-          !valid || !reviewerValid || !address || locked
-        }
-        type="button"
-        onClick={() => void deploy()}
-      >
-        {flow.busy ? "Deploying…" : "Deploy campaign on Arc Testnet"}
-      </Button>
-      <div className="mt-3">
-        <TxStatus
-          state={flow.state}
-          message={flow.message}
-          hash={flow.hash}
-          checking={flow.checking}
-          checkingAction={() => void flow.checkStatus()}
-        />
+      <div className="mt-2 flex flex-wrap gap-2">
+        {hasProgress ? (
+          <>
+            <Button
+              className="h-9 min-h-9 text-xs"
+              disabled={!address || publication.running}
+              type="button"
+              onClick={publication.resume}
+            >
+              {publication.running ? "Publishing…" : "Resume publication"}
+            </Button>
+            {!record?.arcTxHash && (
+              <Button
+                className="h-9 min-h-9 text-xs"
+                disabled={publication.running}
+                type="button"
+                onClick={publication.discard}
+              >
+                Discard draft
+              </Button>
+            )}
+          </>
+        ) : (
+          !published && (
+            <Button
+              className="h-9 min-h-9 text-xs"
+              disabled={
+                !valid ||
+                !reviewerValid ||
+                !!issue ||
+                !address ||
+                publication.running ||
+                starting
+              }
+              type="button"
+              onClick={() => void deploy()}
+            >
+              {publication.running || starting
+                ? "Publishing…"
+                : "Publish campaign"}
+            </Button>
+          )
+        )}
       </div>
-      {campaign && (
+      {(record || publication.message) && (
+        <PublicationChecklist
+          steps={publication.steps}
+          message={publication.message}
+          record={record}
+        />
+      )}
+      {published && record?.campaign && (
         <Link
           className="mt-3 block text-primary underline"
-          href={filmPath(campaign)}
+          href={filmPath(record.campaign)}
         >
-          Open deployed campaign
+          Open published campaign
         </Link>
       )}
     </form>

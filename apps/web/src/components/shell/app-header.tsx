@@ -10,7 +10,7 @@ import { WalletConnect } from "@/components/wallet/wallet-connect";
 import { useAccount } from "wagmi";
 
 const NAV = [
-  // { href: "/demo", label: "Discover" },
+  { href: "/discover", label: "Discover" },
   { href: "/create", label: "Create" },
   { href: "/dashboard/creator", label: "Creator" },
   { href: "/dashboard/backer", label: "Backer" },

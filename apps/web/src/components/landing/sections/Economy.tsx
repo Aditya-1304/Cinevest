@@ -4,7 +4,7 @@ import { useInView, Variants } from 'motion/react';
 import Image from 'next/image';
 import { useRef } from 'react'
 import ScorpImage from "../../../../public/landing/corps.png";
-const EcoNinja = "/landing/camera.svg";
+import heroCharacter from "../../../../public/landing/hero-character.png";
 import { motion } from "motion/react";
 import DarkCircle from '../ui/DarkCircle';
 
@@ -62,15 +62,22 @@ const Economy = () => {
                         />
                     </motion.div>
 
-                    {/* LAYER 2: Ninja Overlay */}
+                    {/* LAYER 2: Mascot Overlay */}
                     <motion.div
                         variants={imageZoomIn}
                         initial="initial"
                         animate="animate"
-                        className="absolute z-30 w-[320px] h-auto pointer-events-none 
-                        left-1/2 -translate-x-1/2 
+                        className="absolute z-30 w-[280px] h-auto pointer-events-none
+                        left-1/2 -translate-x-1/2
                         top-1/2 -translate-y-1/2">
-
+                        <Image
+                            src={heroCharacter}
+                            alt="Cinevest cinema-camera mascot"
+                            width={857}
+                            height={1637}
+                            sizes="280px"
+                            className="object-contain w-full h-auto"
+                        />
                     </motion.div>
 
                     {/* LAYER 3: Dark Circles */}
@@ -109,13 +116,13 @@ const Economy = () => {
                             variants={imageZoomIn}
                             initial="initial"
                             animate="animate"
-                            className="absolute z-20 w-[80%] h-auto pointer-events-none left-1/2 -translate-x-1/2 top-[60%] -translate-y-1/2">
+                            className="absolute z-20 w-[170px] h-auto pointer-events-none left-1/2 -translate-x-1/2 top-[60%] -translate-y-1/2">
                             <Image
-                                src={EcoNinja}
-                                unoptimized
-                                alt='Cinema camera'
-                                width={280}
-                                height={280}
+                                src={heroCharacter}
+                                alt='Cinevest cinema-camera mascot'
+                                width={857}
+                                height={1637}
+                                sizes='170px'
                                 className="object-contain w-full h-auto drop-shadow-[0_20px_40px_rgba(0,0,0,0.6)]"
                             />
                         </motion.div>

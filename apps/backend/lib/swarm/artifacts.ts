@@ -12,6 +12,7 @@ import {
   MAX_MANIFEST_BYTES,
   MAX_POSTER_BYTES,
   normalizeImageContentType,
+  sniffImageContentType,
   parseMilestoneManifest,
   parsePitchManifest,
   readBounded,
@@ -96,11 +97,12 @@ export async function fetchSwarmPoster(referenceInput: string) {
     throw new ArtifactUnavailableError("Configured Swarm gateway is temporarily unavailable");
   }
   if (!response.ok) throw new ArtifactUnavailableError(`Swarm gateway returned ${response.status}`);
-  const contentType = normalizeImageContentType(response.headers.get("content-type"));
+  const declaredType = normalizeImageContentType(response.headers.get("content-type"));
+  const bytes = await readBounded(response, MAX_POSTER_BYTES);
+  const contentType = declaredType ?? sniffImageContentType(bytes);
   if (!contentType) {
     throw new ArtifactInvalidError("Swarm poster has an unsupported image type");
   }
-  const bytes = await readBounded(response, MAX_POSTER_BYTES);
   if (!(await referenceMatches(bytes, reference))) {
     throw new ArtifactInvalidError("Swarm gateway bytes do not match the committed reference");
   }

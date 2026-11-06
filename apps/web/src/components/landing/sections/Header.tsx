@@ -40,9 +40,9 @@ const Header = () => {
                             <Link href="#" className='hover:text-[#c9ec06] transition'>Contact</Link>
                         </nav>
 
-                        <button className='hidden md:inline-flex bg-[#d3ed05] text-black px-4 py-2 rounded-lg font-medium tracking-tight'>
+                        <Link href="/discover" className='hidden md:inline-flex bg-[#d3ed05] text-black px-4 py-2 rounded-lg font-medium tracking-tight'>
                             Explore films
-                        </button>
+                        </Link>
 
                         <Menu className='h-5 w-5 md:hidden ml-auto text-white' />
                     </div>
