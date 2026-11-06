@@ -63,6 +63,8 @@ No files under `apps/web` were changed by this backend work.
 | `GET /api/publications?actor=&digest=` | Public journal status by publication identity |
 | `GET /api/workflows/:operationId?actor=&issuedAt=&signature=` | Creator-signed operation recovery lookup |
 | `POST /api/listings/extend` | Creator-only renewal preflight and durable confirmation/reconciliation |
+| `GET /api/auth/nonce` | Issues a five-minute, one-time SIWE nonce |
+| `POST /api/auth/verify` | Verifies an EOA SIWE signature and returns its address and chain ID; it creates no session |
 | `POST /api/arkiv-rpc` | Bounded allowlist relay for creator-signed Rabdi transactions; no server signing |
 
 All signed requests use `publicationMessage(payloadWithoutSignature)` from
