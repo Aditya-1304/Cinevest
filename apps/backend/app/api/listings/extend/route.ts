@@ -21,7 +21,7 @@ import { deserializeCampaignTerms } from "@/lib/workflows/terms-input";
 const hash = z.string().regex(/^0x[0-9a-fA-F]{64}$/);
 const schema = z.object({ action: z.literal("extend-listing"), actor: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
   entityId: hash, campaignAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
-  targetBlock: z.string().regex(/^[1-9][0-9]{0,19}$/), txHash: hash.optional(), issuedAt: z.number().int(), signature: z.string(),
+  targetBlock: z.string().regex(/^[1-9][0-9]{0,19}$/), txHash: hash.optional(), issuedAt: z.number().int(), signature: z.string().optional(),
 }).strict();
 
 /**
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   let input: z.infer<typeof schema>;
   try { input = schema.parse(await readJson(request)); }
   catch { return NextResponse.json({ error: "Invalid renewal request" }, { status: 400 }); }
-  if (!(await verifyWalletRequest(input))) return NextResponse.json({ error: "Creator signature required" }, { status: 401 });
+  if (!(await verifyWalletRequest(input, request))) return NextResponse.json({ error: "Creator sign-in required" }, { status: 401 });
   try {
     const actor = input.actor.toLowerCase();
     const entityId = input.entityId.toLowerCase();

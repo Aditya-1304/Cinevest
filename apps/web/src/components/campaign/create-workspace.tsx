@@ -56,7 +56,7 @@ export function CreateWorkspace() {
           <WalletConnect />
         </div>
       </div>
-      <div className="grid grid-cols-1 overflow-hidden rounded-2xl border border-white/10 bg-[#04141C] min-[761px]:h-[min(540px,calc(100svh-230px))] min-[761px]:grid-cols-[200px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 overflow-hidden rounded-2xl border border-white/10 bg-[#04141C] min-[761px]:h-[min(680px,calc(100svh-220px))] min-[761px]:grid-cols-[200px_minmax(0,1fr)]">
         <aside
           className="border-b border-white/10 bg-[#072733] px-5 py-5 min-[761px]:border-r min-[761px]:border-b-0 [&>button]:flex [&>button]:w-full [&>button]:cursor-pointer [&>button]:items-center [&>button]:gap-3 [&>button]:rounded-md [&>button]:p-[10px] [&>button]:text-left [&>button]:text-xs [&>button]:text-white/60 [&>button_span]:text-[11px] [&>button_span]:text-white/40 [&>button[aria-current=step]]:bg-[#d3ed05]/10 [&>button[aria-current=step]]:text-white [&>button[aria-current=step]_span]:text-[#d3ed05] [&>p]:mb-3 [&>p]:text-xs [&>p]:font-bold"
           aria-label="Campaign setup steps"

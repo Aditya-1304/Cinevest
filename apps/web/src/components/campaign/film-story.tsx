@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Address } from "viem";
 import { fetchFilmDetail, fetchPitch, posterUrl } from "@/lib/market";
+import { PosterImage } from "./poster-image";
 
 const BLOCKS_PER_DAY = 43_200n;
 
@@ -62,9 +63,7 @@ export function FilmStory({ campaign }: { campaign: Address }) {
 
   return (
     <article className="grid gap-4 rounded-2xl border border-white/10 bg-[#04141C] p-4 min-[641px]:grid-cols-[160px_minmax(0,1fr)]">
-      {/* Verified Swarm bytes served by the backend; next/image cannot optimize this URL. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <PosterImage
         src={posterUrl(manifest.posterRef)}
         alt={`${manifest.title} poster`}
         className="aspect-[2/3] w-full max-w-[160px] rounded-lg bg-[#072733] object-cover"

@@ -32,6 +32,23 @@ const filmSchema = defineSchema("Cinevest.film.v1", {
 
 const RABDI_ID = 7_794_095;
 
+/**
+ * Browser-side Rabdi chain. The Arkiv access key stays on the server: the wallet and the balance
+ * check use the same-origin relay (/api/arkiv-rpc), which forwards to the keyed node, instead of
+ * the rate-limited public endpoint. The placeholder key only silences the SDK's missing-key warning.
+ */
+function rabdiRelayUrl() {
+  return `${window.location.origin}/api/arkiv-rpc`;
+}
+function rabdiChain() {
+  const base = rabdi({ accessKey: "server-side" });
+  // The SDK types the endpoint as a literal URL; only the relay URL differs at runtime.
+  return {
+    ...base,
+    rpcUrls: { ...base.rpcUrls, default: { ...base.rpcUrls.default, http: [rabdiRelayUrl()] } },
+  } as unknown as typeof base;
+}
+
 async function switchTo(
   wallet: ReturnType<typeof createEvmWallet>,
   chain: ReturnType<typeof rabdi>,
@@ -43,6 +60,22 @@ async function switchTo(
     if ((error as { code?: number }).code !== 4902) throw error;
     await wallet.addChain({ chain });
     await wallet.switchChain({ id: chain.id });
+  }
+}
+
+/** True when the wallet holds any tGLM on Rabdi; without it no listing transaction can be sent. */
+export async function hasRabdiFunds(address: string) {
+  try {
+    const response = await fetch(rabdiRelayUrl(), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getBalance", params: [address, "latest"] }),
+    });
+    const body = (await response.json()) as { result?: string };
+    return body.result ? BigInt(body.result) > 0n : true;
+  } catch {
+    // An unreachable RPC must not block the flow; the wallet reports a real shortage itself.
+    return true;
   }
 }
 
@@ -70,7 +103,7 @@ export async function publishCreatorListing(
   )
     throw new Error("Invalid listing reference or operation digest");
 
-  const chain = rabdi({ accessKey: "" });
+  const chain = rabdiChain();
   const wallet = createEvmWallet({ transport: custom(provider) });
   const [account] = await wallet.requestAddresses();
   if (account?.toLowerCase() !== input.terms.creator.toLowerCase())
@@ -119,7 +152,7 @@ export async function extendCreatorListing(
   entityId: `0x${string}`,
   targetBlock: bigint,
 ) {
-  const chain = rabdi({ accessKey: "" });
+  const chain = rabdiChain();
   const wallet = createEvmWallet({ transport: custom(provider) });
   const [account] = await wallet.requestAddresses();
   if (account?.toLowerCase() !== creator.toLowerCase())

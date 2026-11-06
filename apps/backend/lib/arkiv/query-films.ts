@@ -182,6 +182,8 @@ export async function queryFilms({
               return { state: "unavailable" as const };
             }
           },
+          // Each campaign needs four reads; two at a time stays under the public Arc RPC limit.
+          2,
         );
       } catch {
         for (const { index, campaign } of candidates) {

@@ -12,7 +12,7 @@ import { ARC_TESTNET } from "@cinevest/abi";
 const schema = z.object({
   action: z.literal("artifact-upload"), actor: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
   kind: z.enum(["poster", "pitch", "milestone"]),
-  payload: z.unknown(), issuedAt: z.number().int(), signature: z.string(),
+  payload: z.unknown(), issuedAt: z.number().int(), signature: z.string().optional(),
 }).strict();
 
 /** Upload only signed, explicitly public artifacts. Film video never passes through this endpoint. */
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   let input: z.infer<typeof schema>;
   try { input = schema.parse(await readJson(request, 7 * 1024 * 1024)); }
   catch { return NextResponse.json({ error: "Invalid artifact request" }, { status: 400 }); }
-  if (!(await verifyWalletRequest(input))) return NextResponse.json({ error: "Creator signature required" }, { status: 401 });
+  if (!(await verifyWalletRequest(input, request))) return NextResponse.json({ error: "Creator sign-in required" }, { status: 401 });
   let bytes: Uint8Array;
   try {
     if (input.kind === "pitch") {

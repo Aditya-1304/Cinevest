@@ -290,6 +290,14 @@ export function FinanceTermsForm({
                 Discard draft
               </Button>
             )}
+            <Button
+              className="h-9 min-h-9 text-xs"
+              disabled={publication.running}
+              type="button"
+              onClick={publication.startNew}
+            >
+              Start a new film instead
+            </Button>
           </>
         ) : (
           !published && (
@@ -313,6 +321,41 @@ export function FinanceTermsForm({
           )
         )}
       </div>
+      {published && (
+        <div className="mt-2">
+          <Button
+            className="h-9 min-h-9 text-xs"
+            type="button"
+            onClick={publication.startNew}
+          >
+            Create another film
+          </Button>
+        </div>
+      )}
+      {publication.archived.length > 0 && !hasProgress && (
+        <div className="mt-3 space-y-1 rounded-xl border border-white/10 p-3">
+          <p className="!text-white/80">Unfinished publications you set aside</p>
+          {publication.archived.map((item) => (
+            <div
+              key={item.digest}
+              className="flex flex-wrap items-center justify-between gap-2 text-xs"
+            >
+              <span className="text-white/70">
+                {item.title || "Untitled film"}
+                {item.campaign ? " · live on Arc, not listed yet" : ""}
+              </span>
+              <Button
+                className="h-8 min-h-8 text-xs"
+                type="button"
+                disabled={publication.running || !item.digest}
+                onClick={() => publication.restore(item.digest!)}
+              >
+                Resume this one
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
       {(record || publication.message) && (
         <PublicationChecklist
           steps={publication.steps}

@@ -4,22 +4,21 @@ import Link from "next/link";
 import { useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { CAMPAIGN_STAGES } from "@/lib/chain";
-import { filmPath } from "@/lib/paths";
+import { filmPath, watchPath } from "@/lib/paths";
 import { formatUsdc } from "@/lib/format";
 import { fetchMarket, posterUrl, type MarketFilm } from "@/lib/market";
 import { stagePillClass } from "@/lib/stage-style";
+import { PosterImage } from "./poster-image";
 
 function FilmTile({ film }: { film: MarketFilm }) {
   const stage = film.stage === null ? undefined : CAMPAIGN_STAGES[film.stage];
   return (
     <article className="overflow-hidden rounded-2xl border border-white/10 bg-[#04141C]">
       <Link href={filmPath(film.campaignAddress)} className="block">
-        {/* Posters are verified Swarm bytes served by the backend, so next/image cannot optimize them. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <PosterImage
           src={posterUrl(film.posterSwarmRef)}
           alt={`${film.title} poster`}
-          loading="lazy"
+          lazy
           className="aspect-[2/3] w-full bg-[#072733] object-cover"
         />
       </Link>
@@ -45,6 +44,14 @@ function FilmTile({ film }: { film: MarketFilm }) {
             : `${formatUsdc(BigInt(film.raised))} test USDC raised`}
           {film.stale && " (stale)"}
         </p>
+        {film.stage === 3 && (
+          <Link
+            href={watchPath(film.campaignAddress)}
+            className="inline-flex h-8 items-center rounded-lg bg-[#d3ed05] px-3 text-xs font-bold text-black hover:bg-[#e4ff1a]"
+          >
+            Watch film
+          </Link>
+        )}
       </div>
     </article>
   );
