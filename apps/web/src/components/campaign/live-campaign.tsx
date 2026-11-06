@@ -43,7 +43,7 @@ export function LiveCampaign({ campaign }: { campaign: Address }) {
     <CampaignBoundary>
       <div className="w-full space-y-3">
         <FilmStory campaign={campaign} />
-        <Card className="overflow-hidden border-white/10 bg-[#04141C] shadow-[0_18px_60px_rgba(0,0,0,.3)]">
+        <Card className="gap-0 overflow-hidden border-white/10 bg-[#04141C] py-0 shadow-[0_18px_60px_rgba(0,0,0,.3)]">
           <CardHeader className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-white/5 bg-white/[.02] px-5 py-4">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <p className="text-xs font-semibold text-primary">Arc Testnet</p>
@@ -51,7 +51,7 @@ export function LiveCampaign({ campaign }: { campaign: Address }) {
             </div>
             <AddressLink address={campaign} />
           </CardHeader>
-          <CardContent className="space-y-3 px-4 py-3">
+          <CardContent className="space-y-3 px-4 py-4">
             {!factory ? (
               <p role="status">
                 The current contract deployment could not be verified. Funding stays unavailable until the matching revision is deployed.
@@ -180,7 +180,7 @@ export function LiveCampaign({ campaign }: { campaign: Address }) {
             )}
           </CardContent>
           <div className="border-t border-white/5 bg-black/10 px-4 py-2 text-xs">
-            <WalletConnect />
+            <WalletConnect compact />
           </div>
         </Card>
         {factory &&

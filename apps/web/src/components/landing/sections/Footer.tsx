@@ -1,4 +1,5 @@
 "use client";
+import Image from 'next/image';
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Twitter, Facebook, Instagram, Linkedin, ArrowUp } from 'lucide-react';
@@ -54,7 +55,7 @@ const Footer = () => {
 
                     {/* Logo & Description Section */}
                     <div className="flex flex-col items-center lg:items-start justify-center gap-6">
-                        <span className="font-dela text-3xl text-white">cinevest<span className="text-[#c9ec06]">.</span></span>
+                        <span className="font-dela inline-flex items-center gap-2 text-3xl text-white"><Image src="/brand/logo-mark.png" alt="" width={40} height={40} className="size-10" /><span>cinevest<span className="text-[#c9ec06]">.</span></span></span>
                         <p className="max-w-xs text-md text-[#FFFFFF]/70 text-center lg:text-left">
                             Independent stories are better together. <br />
                             Powered by Arc Testnet

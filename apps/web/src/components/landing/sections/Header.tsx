@@ -1,4 +1,5 @@
 "use client";
+import Image from 'next/image';
 import { useState } from 'react';
 import { motion, useScroll, useMotionValueEvent } from 'motion/react';
 import { Menu } from 'lucide-react';
@@ -30,7 +31,7 @@ const Header = () => {
             <div className='py-5'>
                 <div className='container mx-auto px-4 sm:px-6'>
                     <div className='flex items-center gap-4'>
-                        <span className='font-dela text-2xl text-white'>cinevest<span className='text-[#d3ed05]'>.</span></span>
+                        <span className='font-dela inline-flex items-center gap-2 text-2xl text-white'><Image src='/brand/logo-mark.png' alt='' width={32} height={32} priority className='size-8' /><span>cinevest<span className='text-[#d3ed05]'>.</span></span></span>
 
                         <nav className='hidden md:flex flex-1 justify-center gap-6 text-[#FFFFFF]/80 items-center'>
                             <Link href="#" className='hover:text-[#c9ec06] transition'>About</Link>

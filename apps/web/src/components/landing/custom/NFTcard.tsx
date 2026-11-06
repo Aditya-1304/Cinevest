@@ -18,6 +18,7 @@ const NFTcard = ({ imageSrc, imageAlt, rarityScore }: NFTcardProps) => {
             <Image
                 src={TestImage}
                 alt="Film poster"
+                loading="eager"
                 width={324}
                 height={389}
                 className="w-full h-full rounded-[40px] object-cover"

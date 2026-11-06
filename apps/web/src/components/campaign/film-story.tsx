@@ -44,6 +44,7 @@ export function FilmStory({ campaign }: { campaign: Address }) {
   const pitch = useQuery({
     queryKey: ["pitch", campaign, pitchRef],
     enabled: !!pitchRef,
+    retry: 1,
     queryFn: () => fetchPitch(pitchRef!, campaign),
   });
 

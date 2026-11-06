@@ -14,7 +14,8 @@ import { WalletSupportNotice } from "./wallet-support";
 
 const subscribe = () => () => {};
 
-export function WalletConnect() {
+/** `compact` renders the connected state as one inline bar for dashboards and page headers. */
+export function WalletConnect({ compact = false }: { compact?: boolean }) {
   const mounted = useSyncExternalStore(
     subscribe,
     () => true,
@@ -59,6 +60,38 @@ export function WalletConnect() {
   }
 
   const wrongNetwork = connection.chainId !== ARC_TESTNET.id;
+  if (compact)
+    return (
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span className="inline-flex items-center gap-2 text-sm font-semibold text-white">
+          <span className={cn("size-2 rounded-full", wrongNetwork ? "bg-amber-300" : "bg-[#d3ed05]")} aria-hidden />
+          {connection.address.slice(0, 6)}…{connection.address.slice(-4)}
+        </span>
+        <span className={cn("text-xs", wrongNetwork ? "text-amber-300" : "text-white/60")}>
+          {wrongNetwork ? "Wrong network" : "Arc Testnet"}
+        </span>
+        <div className="ml-auto flex flex-wrap gap-2">
+          {wrongNetwork && (
+            <button
+              type="button"
+              className="inline-flex h-8 items-center rounded-lg bg-[#d3ed05] px-3 text-xs font-bold text-black transition hover:bg-[#e4ff1a]"
+              disabled={switchChain.isPending}
+              onClick={() => switchChain.switchChain({ chainId: ARC_TESTNET.id })}
+            >
+              {switchChain.isPending ? "Switching…" : "Switch to Arc Testnet"}
+            </button>
+          )}
+          <button
+            type="button"
+            className="inline-flex h-8 items-center rounded-lg border border-white/15 bg-[#072733] px-3 text-xs font-bold text-white transition hover:border-[#d3ed05]/50"
+            onClick={() => disconnect.disconnect()}
+          >
+            Disconnect
+          </button>
+        </div>
+        <WalletSupportNotice />
+      </div>
+    );
   return (
     <div>
       <p className="text-sm text-white/70">

@@ -47,7 +47,7 @@ const Hero = () => {
                 <div className="relative flex flex-col items-center gap-8 md:flex-row md:items-stretch md:justify-center xl:justify-between">
 
                     {/* left card  */}
-                    <div className="flex flex-col items-center justify-center md:w-[45%] xl:w-[35%]">
+                    <div className="flex flex-col items-center justify-center md:w-[45%] xl:w-[40%]">
                         <NFTcard imageSrc="card1" imageAlt="The Last Monsoon poster" rarityScore={8.7} />
                         <div className="text-left space-y-4 mt-4">
                             <h2 className="font-dela text-3xl">
@@ -107,7 +107,7 @@ const Hero = () => {
                 <motion.img
                     src={heroCharacter.src}
                     alt="Cinevest cinema-camera mascot"
-                    className="h-[clamp(380px,48vw,600px)] w-auto max-w-full"
+                    className="h-[clamp(420px,53vw,660px)] w-auto max-w-full"
                     style={{
                         translateY
                     }}

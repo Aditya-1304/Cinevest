@@ -354,12 +354,10 @@ export function WalletDashboard({ mode }: { mode: Mode }) {
   }
 
   return (
-    <div className="space-y-3">
-      <Card className="border-white/10 bg-[#04141C]">
-        <CardContent className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 p-3 text-sm [&_p]:my-0 [&_div>div]:mt-0 [&_div>div]:gap-2">
-          <WalletConnect />
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <div className="rounded-xl border border-white/10 bg-[#04141C] px-4 py-3 [&_p]:my-0">
+        <WalletConnect compact />
+      </div>
 
       {!factory ? (
         <p role="status">
@@ -463,8 +461,8 @@ function CreatorCard({ row }: { row: Extract<Row, { mode: "creator" }> }) {
       ? row.withdrawableTranche - row.paidTranche
       : 0n;
   return (
-    <Card className="border-white/10 bg-[#04141C]">
-      <CardHeader className="space-y-1 p-4 pb-2">
+    <Card className="gap-3 border-white/10 bg-[#04141C] py-4 ring-0 border">
+      <CardHeader className="space-y-1 px-4">
         <p className="text-xs">
           <span
             className={`inline-block rounded-full border px-3 py-0.5 text-[11px] font-bold ${stagePillClass(CAMPAIGN_STAGES[row.stage] ?? "")}`}
@@ -472,13 +470,13 @@ function CreatorCard({ row }: { row: Extract<Row, { mode: "creator" }> }) {
             {CAMPAIGN_STAGES[row.stage] ?? "Unknown stage"}
           </span>
         </p>
-        <CardTitle className="font-dela text-lg uppercase">
+        <CardTitle className="font-mono text-base normal-case">
           <Link className="break-all underline" href={filmPath(row.address)}>
             {short(row.address)}
           </Link>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 px-4">
         <p>
           {usdc(row.raised)} raised of {usdc(row.terms.fundingGoal)}
         </p>
@@ -526,7 +524,7 @@ function BackerCard({ row }: { row: Extract<Row, { mode: "backer" }> }) {
             {CAMPAIGN_STAGES[row.stage] ?? "Unknown stage"}
           </span>
         </p>
-        <CardTitle className="font-dela text-lg uppercase">
+        <CardTitle className="font-mono text-base normal-case">
           <Link className="break-all underline" href={filmPath(row.address)}>
             {short(row.address)}
           </Link>
