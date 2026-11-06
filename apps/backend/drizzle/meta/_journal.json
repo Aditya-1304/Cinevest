@@ -43,6 +43,13 @@
       "when": 1794009601000,
       "tag": "0005_media_upload_resume",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794009602000,
+      "tag": "0006_media_playback_probe",
+      "breakpoints": true
     }
   ]
 }

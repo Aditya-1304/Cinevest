@@ -2,7 +2,8 @@ import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import { keccak256, stringToBytes } from "viem";
 import { createDatabase } from "@/lib/db";
-import { campaignMediaRelease } from "@/lib/db/schema";
+import { campaignMediaRelease, mediaUploads } from "@/lib/db/schema";
+import type { ProbeResult } from "./probe";
 
 /** Canonical Arc commitment: keccak256 over the UTF-8 bytes of the playback ID, equal to Solidity keccak256(bytes(id)). */
 export const playbackIdHash = (playbackId: string) => keccak256(stringToBytes(playbackId));
@@ -32,4 +33,9 @@ export async function selectRelease(arcChainId: string, campaignAddress: string,
       setWhere: isNull(campaignMediaRelease.lockedAt),
     }).returning();
   return row ?? null;
+}
+
+/** Records the provider policy and delivery probe outcome for an upload (tokens and URLs are never stored). */
+export async function recordProbe(uploadId: string, policyType: string, probe: ProbeResult) {
+  await createDatabase().update(mediaUploads).set({ policyType, probeResult: probe, probedAt: new Date() }).where(eq(mediaUploads.id, uploadId));
 }

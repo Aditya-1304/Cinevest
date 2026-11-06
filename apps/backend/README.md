@@ -70,7 +70,9 @@ No files under `apps/web` were changed by this backend work.
 | `POST /api/media/uploads` | Creator session: starts or resumes (same `attemptKey`) a direct-to-Livepeer upload; returns the upload URLs |
 | `GET /api/media/uploads/:id` | Owner session: reconciles with Livepeer and reports the real status (`pending/uploading/processing/ready/failed`) |
 | `GET /api/media/release?arcChainId=&campaignAddress=` | Public: selected release hash, lock state, and whether it equals Arc `livepeerPlaybackIdHash` |
-| `POST /api/media/release` | Creator session: selects exactly one provider-ready upload and returns the hash for `configureRelease` |
+| `POST /api/media/release` | Creator session: enforces the JWT policy, runs the delivery probe, then selects exactly one provider-ready upload and returns the hash for `configureRelease` (`409` with probe checks if protection fails) |
+| `GET /api/media/release/verify?arcChainId=&campaignAddress=` | Creator/reviewer session: live final-review gate (provider ready, JWT policy, hash = DB = Arc, delivery probe) |
+| `POST /api/playback/authorize` | Session wallet that Arc says paid for a released film gets `{playbackId, token, expiresAt, refreshAt}` |
 | `POST /api/arkiv-rpc` | Bounded allowlist relay for creator-signed Rabdi transactions; no server signing |
 
 All signed requests use `publicationMessage(payloadWithoutSignature)` from
@@ -195,3 +197,29 @@ Rebuild/restart the backend after a new deployment so it imports the new manifes
   or all tranches approved (the point the contract rejects `configureRelease`); a locked selection cannot be
   changed. The release hash and Arc's stored hash are compared by `GET /api/media/release` (`matchesArc`).
   These are trusted offchain checks, not onchain proof.
+
+
+## Protected playback (Phase 8.7–8.9)
+
+- **Policy:** assets are created with, and re-confirmed to have, a `jwt` playback policy (`ensureJwtPolicy`
+  PATCHes then re-reads; it throws unless Livepeer reports `jwt`).
+- **Delivery probe (`lib/media/probe.ts`):** as an anonymous client it fetches the HLS manifest and first
+  segment (must be `401/403`), then with a valid token (must be `200`), and the manifest with an expired,
+  wrong-asset and bad-signature token (must all be `401/403`). Provider-supplied URLs must be HTTPS on a Livepeer host
+  allowlist. Only status codes and the policy are stored on `media_uploads` (`policy_type`, `probe_result`,
+  `probed_at`); tokens and URLs are never stored or logged. Selection and `/release/verify` both run it, so a
+  stale, wrong or unready asset is blocked and the reason is logged (`media.release.verify_failed`). The UI must
+  call `/release/verify` before enabling final approval; these results are trusted offchain evidence, not onchain proof.
+- **Authorization:** the wallet comes only from the session and the asset only from the release row. Access is
+  denied unless the campaign is Arc `Released`, `hasPaidAccess(wallet)` is true, and the stored selection, recomputed
+  hash and Arc `livepeerPlaybackIdHash` are identical. Arc RPC or database failure returns `503` (fail closed).
+- **Token:** ES256 JWT in the `@livepeer/core` `signAccessJwt` format (`action=pull`, `iss`, `pub`, `sub=playbackId`,
+  `video`, `iat`, `exp`), 300 s lifetime, signed with `LIVEPEER_SIGNING_KEY` (base64 PKCS8 PEM from Studio) and
+  `LIVEPEER_SIGNING_PUBLIC_KEY` (base64, as Studio returns it). A mismatched pair refuses to sign. Pass it to the
+  player or as `Livepeer-Jwt`/`?jwt=`. **Renewal:** call authorize again before `refreshAt`; a new token overlaps the
+  old one, so playback is not interrupted. **Disclosure:** a token is a bearer credential and can be shared until it expires.
+- **Key rotation:** create the new key in Studio, set both env values and deploy, then delete the old Studio key
+  only after 300 s so in-flight tokens still validate.
+- **Verification status:** the token format was checked against the official SDK's output and the probe logic against a
+  fake provider that verifies tokens. No real Livepeer asset has been probed yet (no API key in this checkout), so
+  Livepeer's actual playback-info shape and JWT delivery behavior still need one live run.

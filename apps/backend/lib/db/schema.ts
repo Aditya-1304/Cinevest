@@ -3,6 +3,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -32,6 +33,10 @@ export const mediaUploads = pgTable(
     // Provider upload capabilities, held only while status is "uploading" so an interrupted browser can resume.
     uploadUrl: text("upload_url"),
     tusEndpoint: text("tus_endpoint"),
+    // Latest provider policy and delivery-layer probe result: trusted offchain evidence, never secrets.
+    policyType: text("policy_type"),
+    probeResult: jsonb("probe_result"),
+    probedAt: timestamp("probed_at", { withTimezone: true }),
     status: text("status").notNull(),
     ownerWallet: text("owner_wallet").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

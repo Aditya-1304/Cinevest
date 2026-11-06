@@ -9,6 +9,7 @@ const assetSchema = z.object({
   playbackId: z.string().min(1).optional(),
   size: z.number().nonnegative().optional(),
   status: z.object({ phase: z.string() }),
+  playbackPolicy: z.object({ type: z.string() }).nullish(),
 });
 const uploadSchema = z.object({ url: z.url(), tusEndpoint: z.url().optional(), asset: assetSchema });
 
@@ -35,5 +36,15 @@ export async function requestUpload(name: string) {
 
 export async function getAsset(assetId: string) {
   const asset = assetSchema.parse(await call(`/asset/${encodeURIComponent(assetId)}`));
-  return { phase: asset.status.phase, playbackId: asset.playbackId ?? null, size: asset.size ?? null };
+  return { phase: asset.status.phase, playbackId: asset.playbackId ?? null, size: asset.size ?? null, policyType: asset.playbackPolicy?.type ?? "public" };
+}
+
+/** Ensures the asset is gated by signed JWTs; throws unless the provider confirms the nonpublic policy. */
+export async function ensureJwtPolicy(assetId: string) {
+  if ((await getAsset(assetId)).policyType !== "jwt") {
+    await call(`/asset/${encodeURIComponent(assetId)}`, { method: "PATCH", body: JSON.stringify({ playbackPolicy: { type: "jwt" } }) });
+  }
+  const { policyType } = await getAsset(assetId);
+  if (policyType !== "jwt") throw new Error("Livepeer asset is not JWT-gated");
+  return policyType;
 }

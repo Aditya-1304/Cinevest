@@ -36,6 +36,7 @@ export const serverEnvSchema = z.object({
   SWARM_BEE_API_KEY: optionalText,
   LIVEPEER_API_KEY: optionalText,
   LIVEPEER_SIGNING_KEY: optionalText,
+  LIVEPEER_SIGNING_PUBLIC_KEY: optionalText,
   LIVEPEER_WEBHOOK_SECRET: optionalText,
   WORLD_RP_ID: optionalText,
   WORLD_RP_SIGNING_KEY: optionalText,
