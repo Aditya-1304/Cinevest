@@ -1,6 +1,9 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -11,33 +14,57 @@ import {
 /** Stores one-time SIWE challenges; the nonce hash is the lookup key, never a session secret. */
 export const siweNonces = pgTable("siwe_nonces", {
   nonceHash: text("nonce_hash").primaryKey(),
-  wallet: text("wallet").notNull(),
+  wallet: text("wallet"),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   usedAt: timestamp("used_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-/**
- * Maps a creator-owned Livepeer asset to a canonical Arc campaign. This table supports upload
- * retries and processing status; it does not grant viewing access or replace onchain checks.
- */
-export const mediaAssets = pgTable(
-  "media_assets",
+/** Stores retryable provider upload attempts independently from the selected campaign release. */
+export const mediaUploads = pgTable(
+  "media_uploads",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    arcChainId: text("arc_chain_id").notNull().default("5042002"),
     campaignAddress: text("campaign_address").notNull(),
-    assetId: text("asset_id").notNull(),
+    attemptKey: text("attempt_key").notNull(),
+    providerUploadId: text("provider_upload_id"),
+    providerAssetId: text("provider_asset_id"),
+    durationSeconds: integer("duration_seconds"),
     playbackId: text("playback_id"),
+    // Provider upload URL, held only while status is "uploading" so an interrupted browser can resume.
+    uploadUrl: text("upload_url"),
+    tusEndpoint: text("tus_endpoint"),
+    // Latest provider policy and delivery-layer probe result: trusted offchain evidence, never secrets.
+    policyType: text("policy_type"),
+    probeResult: jsonb("probe_result"),
+    probedAt: timestamp("probed_at", { withTimezone: true }),
     status: text("status").notNull(),
     ownerWallet: text("owner_wallet").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex("media_assets_campaign_unique").on(table.campaignAddress),
-    index("media_assets_asset_id_idx").on(table.assetId),
+    check("media_uploads_status_valid", sql`${table.status} in ('pending','uploading','processing','ready','failed')`),
+    uniqueIndex("media_uploads_attempt_unique").on(table.attemptKey),
+    index("media_uploads_campaign_idx").on(table.arcChainId, table.campaignAddress),
+    index("media_uploads_provider_asset_idx").on(table.providerAssetId),
+    index("media_uploads_provider_upload_idx").on(table.providerUploadId),
   ],
 );
+
+/** Separates the single selected release from retryable upload attempts. */
+export const campaignMediaRelease = pgTable("campaign_media_release", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  arcChainId: text("arc_chain_id").notNull(),
+  campaignAddress: text("campaign_address").notNull(),
+  mediaUploadId: uuid("media_upload_id").notNull().references(() => mediaUploads.id),
+  playbackIdHash: text("playback_id_hash"),
+  lockedAt: timestamp("locked_at", { withTimezone: true }),
+  selectedAt: timestamp("selected_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("campaign_media_release_identity").on(table.arcChainId, table.campaignAddress),
+]);
 
 /** Stores campaign-scoped World nullifier ownership after the backend verifies a proof. */
 export const worldVerifications = pgTable(

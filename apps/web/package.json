@@ -14,6 +14,7 @@
     "@cinevest/abi": "*",
     "@ethersphere/core-sdk": "^0.3.0",
     "@fontsource-variable/montserrat": "^5.3.0",
+    "@mux/mux-player-react": "^3.14.1",
     "@radix-ui/react-slot": "^1.2.3",
     "@tanstack/react-query": "^5.90.0",
     "@worldcoin/idkit": "^2.3.0",

@@ -24,7 +24,7 @@ Rules for any agent (human or AI) working in this repository. Read this first in
 
 - User-defined roles: **GPT Sol**, **Terra**, and **Claude models** orchestrate the work. They independently review every change for code correctness, appropriate efficiency, DRY, and the absence of panic or crash paths, and resolve blockers on errors or failing checks.
 - Delegated implementation work goes to OpenCode agents on **DeepSeek V4.1 Flash** or **GLM 5.3 Flash** (the latest GLM release).
-- Honor any model the user has already assigned to a task. Fallback limits, in order: **Antigravity Gemini 3.8 Flash High**, then **GPT 6 Luna xhigh**. Discover live model IDs and options from the available model catalog before delegating; never guess IDs.
+- Honor any model the user has already assigned to a task. Fallback limits, in order: **GPT 6 Luna Medium**  , then **Antigravity Gemini 3.8 Flash High**. Discover live model IDs and options from the available model catalog before delegating; never guess IDs.
 
 - If the preferred OpenCode models (DeepSeek V4.1 Flash or GLM 5.3 Flash) are unavailable, use other available free OpenCode models as the next fallback. Discover available models and verify their IDs and free-tier availability before delegation. Do not guess model IDs or use paid models without authorization.
 

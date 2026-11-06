@@ -1,0 +1,20 @@
+# Local Swarm Bee node (testnet) used by the backend upload pipeline.
+# Password comes from BEE_PASSWORD in .env / environment; never commit it.
+services:
+  bee:
+    image: ethersphere/bee:2.8.3
+    container_name: cinevest-bee
+    command: start
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1633:1633"
+    environment:
+      BEE_API_ADDR: ":1633"
+      BEE_MAINNET: "false"
+      BEE_BLOCKCHAIN_RPC_ENDPOINT: ${BEE_BLOCKCHAIN_RPC_ENDPOINT:-https://rpc.sepolia.ethpandaops.io}
+      BEE_PASSWORD: ${BEE_PASSWORD:?Set BEE_PASSWORD in .env (copy .env.example) before starting the Bee node}
+    volumes:
+      - cinevest-bee-data:/home/bee/.bee
+
+volumes:
+  cinevest-bee-data:
