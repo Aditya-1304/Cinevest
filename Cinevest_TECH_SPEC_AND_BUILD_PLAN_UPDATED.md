@@ -621,22 +621,24 @@ Cinevest/
 
 ### Phase 9 — World IDKit and enforced fair funding (A+B)
 
-- [ ] **P9.0a (Both) [NEW]:** Validate current World IDKit proof type, stable action/campaign-scoped nullifier and wallet signal with a real staging proof before finalizing semantics. **Done:** two wallets/same human and fresh challenge produce the expected scope behavior, or limitation is disclosed.
-- [ ] **P9.0b (A+B) [NEW]:** Specify EIP-712 domain/message encoding, `worldVerifierSigner` creation policy, nonce consumption and contract/TypeScript test vectors before implementing the verifier. **Done:** a signature produced in TypeScript verifies against Solidity fixtures.
+Implementation evidence for P9.0a–P9.3: see `docs/world/phase-9-setup.md`. The challenge page, server RP signing, wallet-bound context checks and EIP-712 encoding/vector are implemented. Live staging/widget evidence remains unverified. P9.4–P9.7a implementation and local evidence are recorded in `docs/world/phase-9-verification.md`, including successful Solidity evaluation of the TypeScript fixture. Live-provider and deployed-contract acceptance are separate from these local checks. P9.8–P9.10 code and handoff are in `docs/world/phase-9-completion.md`; credentials, real widget completion and the matching deployment remain outstanding, so Phase 9 is not yet fully live-accepted.
+
+- [x] **P9.0a (Both) [NEW]:** Limitation disclosed in `docs/world/phase-9-completion.md`; real scope validation remains pending. Validate current World IDKit proof type, stable action/campaign-scoped nullifier and wallet signal with a real staging proof before finalizing semantics. **Done:** two wallets/same human and fresh challenge produce the expected scope behavior, or limitation is disclosed.
+- [x] **P9.0b (A+B) [NEW]:** Specify EIP-712 domain/message encoding, `worldVerifierSigner` creation policy, nonce consumption and contract/TypeScript test vectors before implementing the verifier. **Done:** a signature produced in TypeScript verifies against Solidity fixtures.
 - [ ] **P9.1 (B):** Configure official IDKit app/RP action and proof challenge page. **Done:** mock verification flow opens.
-- [ ] **P9.2 (B):** Generate RP signing signature on server, not browser. **Done:** RP secret absent from bundle.
-- [ ] **P9.3 (B):** Bind proof `signal`/context to SIWE wallet+campaign+nonce. **Done:** wallet substitution test fails.
-- [ ] **P9.4 (B):** Implement official backend proof-verification call. **Done:** success and invalid result handled.
-- [ ] **P9.5 (B):** Store consumed challenges and campaign-scoped verified identity mapping. **Done:** duplicate proof/challenge refused.
-- [ ] **P9.5a (B) [NEW]:** Make challenge consumption and `(campaign,scopedNullifierHash)` binding atomic with unique constraints and an update-if-unused transaction. **Done:** two concurrent verification requests cannot both claim the same challenge.
-- [ ] **P9.6 (A):** Add one-time EIP-712 authorization verifier in `contribute()` for world-gated campaigns. **Done:** unsigned, expired and reused digest reverts.
-- [ ] **P9.7 (A):** Add `nullifierOwner` single-wallet binding and per-human cumulative cap. **Done:** same human using second wallet rejected.
-- [ ] **P9.7a (A) [NEW]:** Fuzz unsigned, expired, duplicate-digest, cross-chain, cross-campaign, wallet-swap and second-wallet/same-nullifier attempts across **every** contribution entrypoint. **Done:** no ungated funding route and no double consumption.
-- [ ] **P9.8 (B):** Issue wallet-bound short-lived attestations after verified World proof. **Done:** usable signed authorization and bad nonce rejected.
-- [ ] **P9.8a (B) [NEW]:** Persist authorization issuance by consumed challenge/digest; retry by returning the same still-valid authorization or a clearly new signed nonce only after policy checks. **Done:** retry cannot mint conflicting permissions for a used proof.
-- [ ] **P9.8b (A+B) [NEW]:** Regenerate `packages/abi` only after Phase 9 contract changes and older contract blockers are resolved; update UI hooks and deployment compatibility checks. **Done:** compiled ABI, TS generated ABI and deployed bytecode revision match.
-- [ ] **P9.9 (Both):** Add UI for World-gated funding with denied, expired and successful paths. **Done:** no payment permitted without protected verification.
-- [ ] **P9.10 (Both):** Write one-page World debrief (integration timing, friction, missing features, improvement). **Done:** required evidence in README or sponsor file.
+- [x] **P9.2 (B):** Generate RP signing signature on server, not browser. **Done:** RP secret absent from bundle.
+- [x] **P9.3 (B):** Bind proof `signal`/context to SIWE wallet+campaign+nonce. **Done:** wallet substitution test fails.
+- [x] **P9.4 (B):** Implement official backend proof-verification call. **Done:** success and invalid result handled.
+- [x] **P9.5 (B):** Store consumed challenges and campaign-scoped verified identity mapping. **Done:** duplicate proof/challenge refused.
+- [x] **P9.5a (B) [NEW]:** Make challenge consumption and `(campaign,scopedNullifierHash)` binding atomic with unique constraints and an update-if-unused transaction. **Done:** two concurrent verification requests cannot both claim the same challenge.
+- [x] **P9.6 (A):** Add one-time EIP-712 authorization verifier in `contribute()` for world-gated campaigns. **Done:** unsigned, expired and reused digest reverts.
+- [x] **P9.7 (A):** Add `nullifierOwner` single-wallet binding and per-human cumulative cap. **Done:** same human using second wallet rejected.
+- [x] **P9.7a (A) [NEW]:** Fuzz unsigned, expired, duplicate-digest, cross-chain, cross-campaign, wallet-swap and second-wallet/same-nullifier attempts across **every** contribution entrypoint. **Done:** no ungated funding route and no double consumption.
+- [x] **P9.8 (B):** Issue wallet-bound short-lived attestations after verified World proof. **Done:** usable signed authorization and bad nonce rejected.
+- [x] **P9.8a (B) [NEW]:** Persist authorization issuance by consumed challenge/digest; retry by returning the same still-valid authorization or a clearly new signed nonce only after policy checks. **Done:** retry cannot mint conflicting permissions for a used proof.
+- [ ] **P9.8b (A+B) [NEW]:** Local ABI regeneration and compatibility guards implemented; matching deployed-bytecode acceptance remains pending. Regenerate `packages/abi` only after Phase 9 contract changes and older contract blockers are resolved; update UI hooks and deployment compatibility checks. **Done:** compiled ABI, TS generated ABI and deployed bytecode revision match.
+- [x] **P9.9 (Both):** Add UI for World-gated funding with denied, expired and successful paths. **Done:** no payment permitted without protected verification.
+- [x] **P9.10 (Both):** Write one-page World debrief (integration timing, friction, missing features, improvement). **Done:** required evidence in README or sponsor file.
 
 ### Phase 10 — integration, fixtures and public deployment (Both)
 

@@ -219,12 +219,14 @@ contract CampaignContributionTest {
 
     function test_WorldGatedCampaignRejectsPermissionlessContribution() external {
         terms.worldGated = true;
+        terms.perHumanLimit = GOAL;
+        factory.configureWorldVerifierSigner(address(0x1234));
         vm.prank(CREATOR);
         Campaign gated = Campaign(factory.createCampaign(terms));
         MockUSDC(CampaignTypes.ARC_TESTNET_USDC).mint(ALICE, GOAL);
         vm.prank(ALICE);
         MockUSDC(CampaignTypes.ARC_TESTNET_USDC).approve(address(gated), GOAL);
-        vm.expectRevert(abi.encodeWithSelector(CampaignTypes.WorldGateUnenforced.selector));
+        vm.expectRevert(abi.encodeWithSelector(CampaignTypes.WorldAuthorizationRequired.selector));
         vm.prank(ALICE);
         gated.contribute(GOAL);
         require(gated.raised() == 0, "gated campaign accepted funding");

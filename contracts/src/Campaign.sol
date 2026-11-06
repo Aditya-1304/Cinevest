@@ -4,17 +4,45 @@ pragma solidity 0.8.28;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 import { CampaignTypes } from "./CampaignTypes.sol";
 import { ICampaignEvents } from "./interfaces/ICampaign.sol";
 
 /// @notice Per-film campaign exposing immutable terms and the lifecycle stage.
 /// @dev Arc owns financial authority; playback hashes commit an asset identifier, not provider availability.
-contract Campaign is ICampaignEvents, ReentrancyGuard {
+contract Campaign is ICampaignEvents, ReentrancyGuard, EIP712 {
     /// @dev Milestone release schedule is fixed at three cumulative 40/70/100 percent steps of the goal.
     uint256 private constant MAX_TRANCHE_INDEX = 2;
     /// @notice After this fixed grace period anyone may recover unspent escrow if the reviewer disappears.
     uint256 public constant CANCELLATION_GRACE_PERIOD = 7 days;
+
+    /// @notice Captured at creation; an authorization cannot be moved between campaigns or chains.
+    address public immutable worldVerifierSigner;
+    bytes32 public constant WORLD_AUTHORIZATION_TYPEHASH = keccak256(
+        "WorldAuthorization(address wallet,address campaign,bytes32 scopedNullifierHash,bytes32 nonce,uint256 deadline)"
+    );
+    mapping(bytes32 digest => bool consumed) public usedWorldAuthorizations;
+    mapping(bytes32 nullifierHash => address wallet) public nullifierOwner;
+    /// @notice Lifetime principal per human; refunds never reopen the funding cap.
+    mapping(bytes32 nullifierHash => uint256 principal) public humanContribution;
+
+    /// @notice Optional initial human quota; zero preserves perpetual World gating.
+    uint256 public verifiedFirstRoundTarget;
+    uint256 public verifiedHumanCount;
+    address private immutable _deploymentFactory;
+    bool private _roundConfigured;
+    mapping(bytes32 approvalId => bool approved) public sponsorApprovals;
+    mapping(bytes32 approvalKey => bool consumed) public consumedSponsorApprovals;
+    event MilestoneApproved(uint8 indexed milestoneIndex, bytes32 evidenceReference);
+    event VerifiedFirstRoundConfigured(uint256 target);
+    event PublicFundingOpened(uint256 verifiedHumans);
+    event SponsorApproved(bytes32 indexed approvalId, address indexed sponsor, uint256 amount, bytes32 conditionsHash);
+    event SponsorDeposited(bytes32 indexed approvalId, address indexed sponsor, uint256 amount);
+    error InvalidExtensionConfiguration();
+    error SponsorApprovalRequired();
+    error IncorrectTokenReceipt();
 
     CampaignTypes.CampaignTerms private _terms;
     CampaignTypes.Stage private _stage;
@@ -50,24 +78,87 @@ contract Campaign is ICampaignEvents, ReentrancyGuard {
     uint256 public releasedAt;
     bytes32 public livepeerPlaybackIdHash;
 
-    constructor(CampaignTypes.CampaignTerms memory terms) {
+    constructor(CampaignTypes.CampaignTerms memory terms, address verifierSigner)
+        EIP712("CinevestWorldAuthorization", "1")
+    {
         CampaignTypes.validateTerms(terms);
+        if (terms.worldGated && verifierSigner == address(0)) revert CampaignTypes.WorldVerifierRequired();
+        _deploymentFactory = msg.sender;
+        worldVerifierSigner = verifierSigner;
         _terms = terms;
         _stage = CampaignTypes.Stage.Funding;
     }
 
-    /// @notice Accepts a USDC principal contribution while funding is open and below the goal.
-    /// @dev Checks, then records state, then pulls USDC, so a failed pull leaves no accounting behind.
-    ///      World-gated campaigns stay fail-closed until the Phase 9 attestation verifier exists; there is
-    ///      deliberately no permissionless path through the gate.
+    /// @notice Permissionless funding is available only to campaigns that do not require World ID.
     function contribute(uint256 amount) external nonReentrant {
+        if (_terms.worldGated && !publicFundingOpen()) revert CampaignTypes.WorldAuthorizationRequired();
+        _contribute(amount);
+    }
+
+    /// @notice Accepts gated funding with a one-use permission issued after backend World verification.
+    /// @dev The same transaction consumes the permission, binds the human and pulls principal;
+    ///      any lifecycle, cap or token-transfer failure rolls all three changes back.
+    function contributeWithAuthorization(
+        uint256 amount, CampaignTypes.WorldAuthorization calldata authorization, bytes calldata signature
+    ) external nonReentrant {
+        if (!_terms.worldGated) revert CampaignTypes.WorldGateNotEnabled();
+        if (authorization.wallet != msg.sender || authorization.campaign != address(this)
+            || authorization.scopedNullifierHash == bytes32(0) || authorization.nonce == bytes32(0)) {
+            revert CampaignTypes.InvalidWorldAuthorization();
+        }
+        if (block.timestamp > authorization.deadline) revert CampaignTypes.WorldAuthorizationExpired();
+        bytes32 digest = worldAuthorizationDigest(authorization);
+        if (usedWorldAuthorizations[digest]) revert CampaignTypes.WorldAuthorizationUsed();
+        (address signer, ECDSA.RecoverError error,) = ECDSA.tryRecoverCalldata(digest, signature);
+        if (error != ECDSA.RecoverError.NoError || signer != worldVerifierSigner) {
+            revert CampaignTypes.InvalidWorldAuthorization();
+        }
+        bytes32 nullifier = authorization.scopedNullifierHash;
+        address owner = nullifierOwner[nullifier];
+        if (owner != address(0) && owner != msg.sender) revert CampaignTypes.WorldNullifierOwned();
+        uint256 funded = humanContribution[nullifier];
+        if (amount > _terms.perHumanLimit - funded) revert CampaignTypes.PerHumanLimitExceeded();
+        usedWorldAuthorizations[digest] = true;
+        nullifierOwner[nullifier] = msg.sender;
+        humanContribution[nullifier] = funded + amount;
+        if (owner == address(0)) {
+            verifiedHumanCount += 1;
+            emit ProofVerified(nullifier, msg.sender);
+            if (verifiedFirstRoundTarget != 0 && verifiedHumanCount == verifiedFirstRoundTarget) {
+                emit PublicFundingOpened(verifiedHumanCount);
+            }
+        }
+        _contribute(amount);
+    }
+
+    /// @notice Factory-only creation configuration; cannot change once published in the registry.
+    function configureVerifiedFirstRound(uint256 target) external {
+        if (msg.sender != _deploymentFactory || _roundConfigured || !_terms.worldGated
+            || target == 0 || _raised != 0) revert InvalidExtensionConfiguration();
+        _roundConfigured = true;
+        verifiedFirstRoundTarget = target;
+        emit VerifiedFirstRoundConfigured(target);
+    }
+
+    /// @notice Public contributions unlock permanently after N distinct, successfully funded humans.
+    function publicFundingOpen() public view returns (bool) {
+        return !_terms.worldGated || (verifiedFirstRoundTarget != 0 && verifiedHumanCount >= verifiedFirstRoundTarget);
+    }
+
+    /// @notice Returns the exact EIP-712 digest used by the backend encoder and replay guard.
+    function worldAuthorizationDigest(CampaignTypes.WorldAuthorization calldata authorization) public view returns (bytes32) {
+        return _hashTypedDataV4(keccak256(abi.encode(
+            WORLD_AUTHORIZATION_TYPEHASH, authorization.wallet, authorization.campaign,
+            authorization.scopedNullifierHash, authorization.nonce, authorization.deadline
+        )));
+    }
+
+    /// @dev Both external funding routes share lifecycle, goal, accounting and transfer behavior.
+    function _contribute(uint256 amount) private {
         if (amount == 0) revert CampaignTypes.ZeroContribution();
         if (_stage != CampaignTypes.Stage.Funding) revert CampaignTypes.FundingStageEnded();
-        if (block.timestamp >= _terms.fundingDeadline) {
-            revert CampaignTypes.FundingDeadlinePassed();
-        }
-        if (_terms.worldGated) revert CampaignTypes.WorldGateUnenforced();
-        uint256 remaining = _terms.fundingGoal - _raised; // raised is always <= goal, so this is safe
+        if (block.timestamp >= _terms.fundingDeadline) revert CampaignTypes.FundingDeadlinePassed();
+        uint256 remaining = _terms.fundingGoal - _raised;
         if (amount > remaining) revert CampaignTypes.ContributionOverRemaining(amount, remaining);
         _raised += amount;
         _units[msg.sender] += amount;
@@ -141,6 +232,7 @@ contract Campaign is ICampaignEvents, ReentrancyGuard {
             );
         }
         _approvedEvidence[index] = actualEvidenceHash;
+        emit MilestoneApproved(index, actualEvidenceHash);
         if (_approvedTrancheCount <= index) _approvedTrancheCount = index + 1;
     }
 
@@ -314,6 +406,40 @@ contract Campaign is ICampaignEvents, ReentrancyGuard {
         if (_stage != CampaignTypes.Stage.Released) revert CampaignTypes.ReleasedStageRequired();
         if (hasAccess[msg.sender]) revert CampaignTypes.AccessAlreadyPurchased();
         uint256 price = _terms.watchPrice;
+        hasAccess[msg.sender] = true;
+        SafeERC20.safeTransferFrom(IERC20(_terms.usdc), msg.sender, address(this), price);
+        _creditRevenue(price);
+        emit WatchPurchased(msg.sender, price);
+    }
+
+    /// @notice Independent reviewer approves an exact sponsor, amount and offchain conditions commitment.
+    /// @dev Approval IDs are single-use and can be revoked before a deposit; conditions must be reviewed offchain.
+    function approveSponsor(bytes32 approvalId, address sponsor, uint256 amount, bytes32 conditionsHash, bool approved) external {
+        if (msg.sender != _terms.reviewer) revert CampaignTypes.ReviewerOnly();
+        if (sponsor == address(0) || amount == 0 || conditionsHash == bytes32(0)) revert InvalidExtensionConfiguration();
+        bytes32 key = keccak256(abi.encode(approvalId, sponsor, amount, conditionsHash));
+        if (consumedSponsorApprovals[key]) revert SponsorApprovalRequired();
+        sponsorApprovals[key] = approved;
+        emit SponsorApproved(approvalId, sponsor, approved ? amount : 0, conditionsHash);
+    }
+
+    /// @notice Pulls real USDC before crediting the same capped waterfall used by paid viewing.
+    function depositSponsor(bytes32 approvalId, uint256 amount, bytes32 conditionsHash) external nonReentrant {
+        if (_stage != CampaignTypes.Stage.Released) revert CampaignTypes.ReleasedStageRequired();
+        bytes32 key = keccak256(abi.encode(approvalId, msg.sender, amount, conditionsHash));
+        if (!sponsorApprovals[key]) revert SponsorApprovalRequired();
+        sponsorApprovals[key] = false;
+        consumedSponsorApprovals[key] = true;
+        IERC20 token = IERC20(_terms.usdc);
+        uint256 beforeBalance = token.balanceOf(address(this));
+        SafeERC20.safeTransferFrom(token, msg.sender, address(this), amount);
+        if (token.balanceOf(address(this)) - beforeBalance != amount) revert IncorrectTokenReceipt();
+        _creditRevenue(amount);
+        emit SponsorDeposited(approvalId, msg.sender, amount);
+    }
+
+    /// @dev Both receipt sources share rounding, repayment-cap and rights-expiry accounting.
+    function _creditRevenue(uint256 price) private {
         uint256 cap = Math.mulDiv(_raised, _terms.repaymentCapBps, CampaignTypes.BPS);
         uint256 funderAmount;
         if (block.timestamp < releasedAt + _terms.rightsDuration && funderAllocated < cap) {
@@ -322,7 +448,6 @@ contract Campaign is ICampaignEvents, ReentrancyGuard {
             );
         }
         uint256 creatorAmount = price - funderAmount;
-        hasAccess[msg.sender] = true;
         funderAllocated += funderAmount;
         creatorAllocated += creatorAmount;
         if (funderAmount != 0) {
@@ -337,8 +462,6 @@ contract Campaign is ICampaignEvents, ReentrancyGuard {
             }
             accRewardPerUnit += increment;
         }
-        SafeERC20.safeTransferFrom(IERC20(_terms.usdc), msg.sender, address(this), price);
-        emit WatchPurchased(msg.sender, price);
         emit RevenueCredited(funderAmount, creatorAmount);
     }
 

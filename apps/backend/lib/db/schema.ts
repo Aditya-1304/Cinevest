@@ -71,13 +71,18 @@ export const worldVerifications = pgTable(
   "world_verifications",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    arcChainId: text("arc_chain_id").notNull().default("5042002"),
+    environment: text("environment").notNull().default("legacy"),
     campaignAddress: text("campaign_address").notNull(),
+    credentialExpiresAt: timestamp("credential_expires_at", { withTimezone: true }),
     scopedNullifierHash: text("scoped_nullifier_hash").notNull(),
     wallet: text("wallet").notNull(),
     verifiedAt: timestamp("verified_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex("world_verifications_campaign_nullifier_unique").on(
+      table.arcChainId,
+      table.environment,
       table.campaignAddress,
       table.scopedNullifierHash,
     ),
@@ -90,13 +95,22 @@ export const proofChallenges = pgTable(
   "proof_challenges",
   {
     nonceHash: text("nonce_hash").primaryKey(),
+    contextHash: text("context_hash"),
+    proofHash: text("proof_hash"),
+    verificationId: uuid("verification_id").references(() => worldVerifications.id),
+    credentialExpiresAt: timestamp("credential_expires_at", { withTimezone: true }),
+    arcChainId: text("arc_chain_id").notNull().default("5042002"),
+    environment: text("environment").notNull().default("legacy"),
     wallet: text("wallet").notNull(),
     campaignAddress: text("campaign_address").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     consumedAt: timestamp("consumed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index("proof_challenges_wallet_campaign_idx").on(table.wallet, table.campaignAddress)],
+  (table) => [
+    index("proof_challenges_wallet_campaign_idx").on(table.wallet, table.campaignAddress),
+    uniqueIndex("proof_challenges_proof_unique").on(table.proofHash),
+  ],
 );
 
 /** Durable publication checkpoints; compare-and-set updates prevent concurrent retries. */
@@ -133,3 +147,17 @@ export const listingExtensions = pgTable("listing_extensions", {
   revision: integer("revision").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, table => [uniqueIndex("listing_extension_identity").on(table.actor, table.entityId, table.targetBlock)]);
+
+/** One durable permission per consumed challenge. Retries return this row and never sign a replacement. */
+export const worldAuthorizations = pgTable("world_authorizations", {
+  challengeNonceHash: text("challenge_nonce_hash").primaryKey().references(() => proofChallenges.nonceHash),
+  digest: text("digest").notNull(),
+  nonce: text("nonce").notNull(),
+  signer: text("signer").notNull(),
+  deadline: timestamp("deadline", { withTimezone: true }).notNull(),
+  signature: text("signature").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("world_authorizations_digest_unique").on(table.digest),
+  uniqueIndex("world_authorizations_nonce_unique").on(table.nonce),
+]);

@@ -8,5 +8,5 @@ export const arcTestnetDeployment = {
   "blockNumber": 70992640,
   "creationBytecodeHash": "0x98fbb5409660c664958f686d211cfba62b78eaa5edeeebdcb55c4a934233fb3e",
   "runtimeCodeHash": "0xe64c98d3f39e6351dfcd067a7a13cfaac052abee35d53a16bf27de9ac081d35e",
-  "compatible": true
+  "compatible": false
 } as const;

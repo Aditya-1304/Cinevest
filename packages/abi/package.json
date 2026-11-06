@@ -8,7 +8,8 @@
     "./campaign-terms-digest": "./src/campaign-terms-digest.ts",
     "./Campaign.json": "./abi/Campaign.json",
     "./CampaignFactory.json": "./abi/CampaignFactory.json",
-    "./IERC20.json": "./abi/IERC20.json"
+    "./IERC20.json": "./abi/IERC20.json",
+    "./ThresholdReviewer.json": "./abi/ThresholdReviewer.json"
   },
   "dependencies": { "viem": "^2.38.0" }
 }

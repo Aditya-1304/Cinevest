@@ -16,12 +16,28 @@ contract CampaignFactory {
     /// @notice The only token campaigns created through this factory may settle in.
     address public immutable USDC;
 
+    /// @notice Deployment administrator may configure a separate verifier key exactly once.
+    address public immutable worldVerifierAdmin;
+    address public worldVerifierSigner;
+    event WorldVerifierConfigured(address indexed signer);
+
     mapping(address campaign => bool registered) private _isCampaign;
     address[] private _campaigns;
 
     constructor() {
         CampaignTypes.ensureArcTestnet();
         USDC = CampaignTypes.ARC_TESTNET_USDC;
+        worldVerifierAdmin = msg.sender;
+    }
+
+    /// @notice Pins the backend attestation key before gated campaigns can be created.
+    /// @dev Existing campaigns retain their captured signer; no creator-controlled signer override exists.
+    function configureWorldVerifierSigner(address signer) external {
+        if (msg.sender != worldVerifierAdmin) revert CampaignTypes.WorldVerifierAdminOnly();
+        if (worldVerifierSigner != address(0)) revert CampaignTypes.WorldVerifierAlreadyConfigured();
+        if (signer == address(0) || signer == worldVerifierAdmin) revert CampaignTypes.WorldVerifierRequired();
+        worldVerifierSigner = signer;
+        emit WorldVerifierConfigured(signer);
     }
 
     /// @notice Deploys a campaign with validated immutable terms; invalid terms revert here at the creation boundary.
@@ -31,7 +47,20 @@ contract CampaignFactory {
     {
         if (terms.creator == address(0)) revert CampaignTypes.CreatorRequired();
         if (msg.sender != terms.creator) revert CampaignTypes.CreatorOnly();
-        campaign = address(new Campaign(terms));
+        campaign = address(new Campaign(terms, terms.worldGated ? worldVerifierSigner : address(0)));
+        _isCampaign[campaign] = true;
+        _campaigns.push(campaign);
+        emit CampaignCreated(terms.creator, campaign);
+    }
+
+    /// @notice Creates a World-gated campaign that opens public funding after N unique humans contribute.
+    function createCampaignWithVerifiedRound(CampaignTypes.CampaignTerms calldata terms, uint256 target)
+        external returns (address campaign)
+    {
+        if (msg.sender != terms.creator) revert CampaignTypes.CreatorOnly();
+        Campaign deployed = new Campaign(terms, worldVerifierSigner);
+        deployed.configureVerifiedFirstRound(target);
+        campaign = address(deployed);
         _isCampaign[campaign] = true;
         _campaigns.push(campaign);
         emit CampaignCreated(terms.creator, campaign);

@@ -1,0 +1,48 @@
+{
+  "description": "Public development fixture key only; never use this key for any deployment.",
+  "privateKey": "0x1111111111111111111111111111111111111111111111111111111111111111",
+  "signer": "0x19E7E376E7C213B7E7e7e46cc70A5dD086DAff2A",
+  "domain": {
+    "name": "CinevestWorldAuthorization",
+    "version": "1",
+    "chainId": 5042002,
+    "verifyingContract": "0x2222222222222222222222222222222222222222"
+  },
+  "types": {
+    "WorldAuthorization": [
+      {
+        "name": "wallet",
+        "type": "address"
+      },
+      {
+        "name": "campaign",
+        "type": "address"
+      },
+      {
+        "name": "scopedNullifierHash",
+        "type": "bytes32"
+      },
+      {
+        "name": "nonce",
+        "type": "bytes32"
+      },
+      {
+        "name": "deadline",
+        "type": "uint256"
+      }
+    ]
+  },
+  "primaryType": "WorldAuthorization",
+  "message": {
+    "wallet": "0x3333333333333333333333333333333333333333",
+    "campaign": "0x2222222222222222222222222222222222222222",
+    "scopedNullifierHash": "0x4444444444444444444444444444444444444444444444444444444444444444",
+    "nonce": "0x5555555555555555555555555555555555555555555555555555555555555555",
+    "deadline": "2000000000"
+  },
+  "domainSeparator": "0x5f20920347810b108d40dc9a2acf8d520ae3f05bc5621990ad9683b5d651dfcd",
+  "structHash": "0x7bac004b3b4f298979d9d1016db1a5c9cf7fe420730bbd309a142842e919af52",
+  "digest": "0x36285ed4ff461622809e869cd24c178deabc440295357ebe625c5d1200316d5c",
+  "signature": "0x095fd19ddfe36e032cb6f815a835c7bed66e67c2f0e3f66d76838a89bcf21af834d41e5890fe61afb7ce60d282a260cc06e3bcef597fcef201833d5186bbd5d51c",
+  "typeHash": "0x269926ca8702071a562e67915fb4762cd4804cde43eb8d0b442dbe5453794daf"
+}

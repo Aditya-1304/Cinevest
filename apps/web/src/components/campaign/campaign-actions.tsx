@@ -6,6 +6,7 @@ import {
   useBlock,
   usePublicClient,
   useReadContracts,
+  useReadContract,
   useSwitchChain,
   useWriteContract,
 } from "wagmi";
@@ -15,12 +16,15 @@ import {
   parseEventLogs,
   parseUnits,
   zeroAddress,
+  verifyTypedData,
   type Address,
   type Hash,
 } from "viem";
 import { ARC_TESTNET, type CampaignTerms } from "@/lib/chain";
 import { formatUsdc } from "@/lib/format";
-import { campaignAbi } from "@cinevest/abi";
+import { campaignAbi, worldAuthorizationData, worldAuthorizationDigest, type WorldAuthorizationGrant } from "@cinevest/abi";
+import { ARC_TESTNET_DEPLOYMENT } from "@/lib/chain";
+import { WorldChallenge } from "@/components/world/world-challenge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TxStatus } from "@/components/ui/tx-status";
@@ -45,7 +49,14 @@ export function CampaignActions({
     query: { refetchInterval: 15_000 },
   });
   const [amount, setAmount] = useState("");
+  const [worldGrant, setWorldGrant] = useState<WorldAuthorizationGrant>();
   const flow = useTxFlow();
+  const publicRound = useReadContract({
+    address: campaign, abi: campaignAbi, functionName: "publicFundingOpen",
+    chainId: ARC_TESTNET.id, query: { refetchInterval: 15_000 },
+  });
+  // Older campaigns lack this extension; a failed read preserves their original World gate.
+  const requiresWorld = terms.worldGated && publicRound.data !== true;
   const reads = useReadContracts({
     contracts: [
       {
@@ -139,7 +150,7 @@ export function CampaignActions({
     reads.isError || reads.data?.some((read) => read.status === "failure");
   // While uncertain, no action resubmits until "Check status again" resolves it.
   const ready =
-    !!address && !flow.busy && flow.state !== "uncertain" && !readsFailed;
+    ARC_TESTNET_DEPLOYMENT.compatible && !!address && !flow.busy && flow.state !== "uncertain" && !readsFailed;
   const creator = address?.toLowerCase() === terms.creator.toLowerCase();
   const reviewer = address?.toLowerCase() === terms.reviewer.toLowerCase();
   // Both claim amounts are cumulative-supply minus cumulative-withdrawn, clamped to zero.
@@ -212,10 +223,14 @@ export function CampaignActions({
       /* Invalid amounts remain disabled. */
     }
   }
+  const worldReady = Boolean(worldGrant && worldGrant.chainId === ARC_TESTNET.id
+    && worldGrant.authorization.wallet.toLowerCase() === address?.toLowerCase()
+    && worldGrant.authorization.campaign.toLowerCase() === campaign.toLowerCase()
+    && block.data && BigInt(worldGrant.authorization.deadline) > block.data.timestamp);
   const canFund =
     ready &&
     stage === 0 &&
-    !terms.worldGated &&
+    (!requiresWorld || worldReady) &&
     units > 0n &&
     raised !== undefined &&
     units <= terms.fundingGoal - raised &&
@@ -255,6 +270,24 @@ export function CampaignActions({
           BigInt(Math.floor(Date.now() / 1000)) >= terms.fundingDeadline
         )
           throw new Error("Funding is closed or the amount is invalid.");
+        if (requiresWorld) {
+          if (!worldGrant || !worldReady) throw new Error("Verify with World ID before funding.");
+          const authorization = { ...worldGrant.authorization, deadline: BigInt(worldGrant.authorization.deadline) };
+          const signer = await client.readContract({ address: campaign, abi: campaignAbi, functionName: "worldVerifierSigner" });
+          if (worldGrant.digest !== worldAuthorizationDigest(ARC_TESTNET.id, authorization)
+              || !await verifyTypedData({ ...worldAuthorizationData(ARC_TESTNET.id, authorization), address: signer, signature: worldGrant.signature })) {
+            throw new Error("World funding permission is invalid. Verify again.");
+          }
+          const [used, owner, funded] = await Promise.all([
+            client.readContract({ address: campaign, abi: campaignAbi, functionName: "usedWorldAuthorizations", args: [worldGrant.digest] }),
+            client.readContract({ address: campaign, abi: campaignAbi, functionName: "nullifierOwner", args: [authorization.scopedNullifierHash] }),
+            client.readContract({ address: campaign, abi: campaignAbi, functionName: "humanContribution", args: [authorization.scopedNullifierHash] }),
+          ]);
+          if (authorization.deadline <= BigInt(Math.floor(Date.now() / 1000)) || used
+              || (owner !== zeroAddress && owner.toLowerCase() !== address.toLowerCase()) || funded + units > terms.perHumanLimit) {
+            throw new Error("World permission expired, used or human limit exceeded. Verify again if eligible.");
+          }
+        }
         const allowance = await client.readContract({
           address: terms.usdc,
           abi: erc20Abi,
@@ -283,17 +316,19 @@ export function CampaignActions({
       }
       let tx: Hash;
       if (action === "contribute") {
-        const simulation = await client.simulateContract({
-          address: campaign,
-          abi: campaignAbi,
-          functionName: action,
-          args: [units],
-          account: address,
-        });
-        tx = await writer.writeContractAsync({
-          ...simulation.request,
-          chainId: ARC_TESTNET.id,
-        });
+        if (requiresWorld && (!worldGrant || !worldReady
+            || BigInt(worldGrant.authorization.deadline) <= BigInt(Math.floor(Date.now() / 1000)))) {
+          setWorldGrant(undefined);
+          throw new Error("World funding permission expired. Verify again.");
+        }
+        if (requiresWorld && worldGrant) {
+          const simulation = await client.simulateContract({ address: campaign, abi: campaignAbi, functionName: "contributeWithAuthorization",
+            args: [units, { ...worldGrant.authorization, deadline: BigInt(worldGrant.authorization.deadline) }, worldGrant.signature], account: address });
+          tx = await writer.writeContractAsync({ ...simulation.request, chainId: ARC_TESTNET.id });
+        } else {
+          const simulation = await client.simulateContract({ address: campaign, abi: campaignAbi, functionName: "contribute", args: [units], account: address });
+          tx = await writer.writeContractAsync({ ...simulation.request, chainId: ARC_TESTNET.id });
+        }
       } else {
         const simulation = await client.simulateContract({
           address: campaign,
@@ -317,6 +352,7 @@ export function CampaignActions({
         }).find(
           (event) => event.args.claimant.toLowerCase() === address.toLowerCase(),
         );
+        if (action === "contribute" && terms.worldGated) setWorldGrant(undefined);
         await cache.invalidateQueries();
         if (payment)
           return `Claim confirmed: ${formatUsdc(payment.args.amount)} test USDC paid.`;
@@ -378,16 +414,18 @@ export function CampaignActions({
               onChange={(e) => setAmount(e.target.value)}
               className="min-h-11 w-full rounded-md border border-white/15 bg-[#072733] px-3 text-white"
             />
+            {requiresWorld && <WorldChallenge key={`${campaign}:${address}`} campaign={campaign}
+              embedded disabled={!ready || deadlinePassed} onAuthorized={setWorldGrant} />}
             <Button
               disabled={!canFund}
               onClick={() => void transact("contribute")}
             >
               {flow.busy ? "Transaction pending…" : "Approve and contribute"}
             </Button>
-            {terms.worldGated && (
+            {requiresWorld && (
               <p>
-                Human verification is required; funding remains unavailable
-                until World integration.
+                {worldReady ? "World ID permission ready. The contract enforces your cumulative human limit."
+                  : "Funding is locked. Verify with World ID, or request a fresh proof if your permission expired."}
               </p>
             )}
             {deadlinePassed && (
