@@ -11,7 +11,9 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint apps packages",
     "contracts:build": "cd contracts && forge build",
-    "contracts:test": "cd contracts && forge test"
+    "contracts:test": "cd contracts && forge test",
+    "contracts:abi": "npm run contracts:build && node scripts/generate-abi.mjs",
+    "contracts:deploy:arc": "NODE_USE_ENV_PROXY=1 node scripts/deploy-arc.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
