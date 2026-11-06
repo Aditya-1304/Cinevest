@@ -6,8 +6,9 @@ node --conditions=react-server apps/backend/scripts/reconcile-publications.mjs 2
 
 The optional limit is 1–100 operations (default 20). Configuration loads from
 `apps/backend/.env.local`; `DATABASE_URL` and the configured provider endpoints
-must be available. Run manually, without another recovery worker writing the same
-operations. Atomic journal transitions reject concurrent state changes.
+must be available. Atomic journal transitions reject concurrent state changes. The measurement-gated
+background runner and public consistency exporter are documented in
+`scripts/PHASE12.md`.
 
 The command checks stored Arc hashes and looks up existing creator-owned Arkiv
 entities. It never submits deployment or publication transactions. Operations

@@ -6,6 +6,7 @@ import { rabdi } from "@arkiv-network/sdk/chains";
 import { asc, eq, and } from "@arkiv-network/sdk/query";
 import { str } from "@arkiv-network/sdk/schema";
 import { http } from "viem";
+import { PortableManifest } from "@/components/campaign/portable-manifest";
 import { filmSchema } from "@/lib/arkiv-creator";
 
 type Listing = { id: string; title: string; genre: string; creator: string; campaign: string };
@@ -61,6 +62,7 @@ export default function Explorer() {
       <p className="break-all">Creator: {film.creator}</p>
       <a href={`https://testnet.arcscan.app/address/${film.campaign}`}>Campaign on Arc</a>{" · "}
       <a href={`https://rabdi.explorer.arkiv.network/entity/${film.id}`}>Arkiv entity</a>
+      <PortableManifest entityId={film.id} />
     </li>)}</ul>
     {more && <button disabled={busy} onClick={() => void search(true)}>Load more</button>}
   </main>;

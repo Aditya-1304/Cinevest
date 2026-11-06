@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { keccak256 } from 'viem';
 
 /** Export compiler ABIs without maintaining a second, manually edited contract interface. */
-for (const [contract, name] of [['Campaign', 'campaign'], ['CampaignFactory', 'campaignFactory'], ['IERC20', 'erc20']]) {
+for (const [contract, name] of [['Campaign', 'campaign'], ['CampaignFactory', 'campaignFactory'], ['IERC20', 'erc20'], ['ThresholdReviewer', 'thresholdReviewer']]) {
   const artifact = JSON.parse(await readFile(`contracts/out/${contract}.sol/${contract}.json`, 'utf8'));
   await mkdir('packages/abi/abi', { recursive: true });
   await writeFile(`packages/abi/abi/${contract}.json`, `${JSON.stringify(artifact.abi, null, 2)}\n`);
@@ -20,4 +20,4 @@ try {
 } catch (error) {
   if (error.code !== 'ENOENT') throw error;
 }
-await writeFile('packages/abi/src/index.ts', '/** Shared compiler-generated interfaces for browser and server contract clients. */\nexport { campaignAbi } from "./campaign";\nexport { campaignFactoryAbi } from "./campaignFactory";\nexport { erc20Abi } from "./erc20";\nexport { ARC_TESTNET, ARC_TESTNET_USDC, ARC_TESTNET_DEPLOYMENT, type CampaignTerms } from "./config";\nexport { campaignTermsDigest } from "./campaign-terms-digest";\n' + 'export { worldAuthorizationTypes, worldAuthorizationData, worldAuthorizationDigest, type WorldAuthorization, type WorldAuthorizationGrant } from "./world-authorization";\n' + deploymentExport);
+await writeFile('packages/abi/src/index.ts', 'export { thresholdReviewerAbi } from "./thresholdReviewer";\n/** Shared compiler-generated interfaces for browser and server contract clients. */\nexport { campaignAbi } from "./campaign";\nexport { campaignFactoryAbi } from "./campaignFactory";\nexport { erc20Abi } from "./erc20";\nexport { ARC_TESTNET, ARC_TESTNET_USDC, ARC_TESTNET_DEPLOYMENT, type CampaignTerms } from "./config";\nexport { campaignTermsDigest } from "./campaign-terms-digest";\n' + 'export { worldAuthorizationTypes, worldAuthorizationData, worldAuthorizationDigest, type WorldAuthorization, type WorldAuthorizationGrant } from "./world-authorization";\n' + deploymentExport);

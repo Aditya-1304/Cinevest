@@ -1,3 +1,4 @@
+export { thresholdReviewerAbi } from "./thresholdReviewer";
 /** Shared compiler-generated interfaces for browser and server contract clients. */
 export { campaignAbi } from "./campaign";
 export { campaignFactoryAbi } from "./campaignFactory";
