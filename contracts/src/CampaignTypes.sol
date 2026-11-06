@@ -34,7 +34,17 @@ library CampaignTypes {
     error FundingStageEnded();
     error FundingDeadlinePassed();
     error ContributionOverRemaining(uint256 requested, uint256 remaining);
-    error WorldGateUnenforced();
+    error WorldAuthorizationRequired();
+    error WorldGateNotEnabled();
+    error WorldVerifierRequired();
+    error WorldVerifierAlreadyConfigured();
+    error WorldVerifierAdminOnly();
+    error InvalidWorldAuthorization();
+    error WorldAuthorizationExpired();
+    error WorldAuthorizationUsed();
+    error WorldNullifierOwned();
+    error PerHumanLimitRequired();
+    error PerHumanLimitExceeded();
     error FundingGoalNotReached(uint256 raised, uint256 goal);
     error FundingGoalReached();
     error FundingDeadlineNotReached(uint256 deadline);
@@ -69,6 +79,7 @@ library CampaignTypes {
 
     /// @notice Reverts on terms that could create an unfundable or self-dealing campaign.
     function validateTerms(CampaignTerms memory terms) internal view {
+        if (terms.worldGated && terms.perHumanLimit == 0) revert PerHumanLimitRequired();
         if (terms.creator == address(0)) revert CreatorRequired();
         if (terms.reviewer == address(0)) revert ReviewerRequired();
         if (terms.reviewer == terms.creator) revert ReviewerIndependent();
@@ -100,6 +111,16 @@ library CampaignTypes {
         Pending,
         Approved,
         Rejected
+    }
+
+    /// @notice One-use backend permission bound to a human, wallet, campaign and execution chain.
+    /// @dev Field order is the EIP-712 schema shared with the backend World authorization encoder.
+    struct WorldAuthorization {
+        address wallet;
+        address campaign;
+        bytes32 scopedNullifierHash;
+        bytes32 nonce;
+        uint256 deadline;
     }
 
     /// @notice Immutable funding, production, viewing, and revenue-sharing configuration.

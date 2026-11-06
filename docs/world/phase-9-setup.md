@@ -1,5 +1,7 @@
 # World ID: P9.0a–P9.3
 
+P9.4–P9.7a follow-up: see [verification implementation and evidence](phase-9-verification.md).
+
 ## Integration and scope evidence
 
 The implementation uses official IDKit 4.6.0, v4 uniqueness requests, the
@@ -60,18 +62,19 @@ RP nonce, exactly one human credential and the official `hashSignal(signal)`.
 It returns `{contextValidated:true, verified:false}` only. A second SIWE wallet
 cannot use the first wallet's token. Editing the token breaks its signature;
 editing the proof signal hash fails context validation. These are implementation
-properties from static review, not executed substitution-test evidence. Proofs
-are not persisted or consumed here; replay prevention and atomic binding belong
-to P9.5/P9.5a. P9.4 must verify cryptography before trusting any returned nullifier.
+properties from static review, not executed substitution-test evidence. This diagnostic route does not persist or consume proofs. The implemented
+`/api/world/verify` route performs the provider call and atomic consumption; see
+the follow-up for its separate acceptance boundary.
 
 ## EIP-712 authorization contract (P9.0b)
 
 The RP signer authenticates World requests. A **separate** `worldVerifierSigner`
 authorizes campaign funding. Create a fresh backend-controlled secp256k1 key per
 deployment environment, preferably held by a managed signer. Never reuse the RP,
-deployer, session or fixture key. The factory must capture its nonzero public
-address when creating a gated campaign; existing campaign signer is immutable.
-Do not enable gated campaign creation until the P9.6 verifier exists. A signer
+deployer, session or fixture key. The factory captures its nonzero public address when creating a gated campaign;
+the campaign signer is immutable. The implemented factory allows its deployment
+administrator to configure this separate signer exactly once. Gated creation
+reverts until configuration is complete. A signer
 compromise requires stopping issuance and migrating to new campaigns; silent
 signer replacement is outside this policy.
 
@@ -90,11 +93,9 @@ The TypeScript encoding is in `apps/backend/lib/world/authorization.ts`; it does
 not sign or issue permissions. `authorization-vector.json` contains a deterministic
 public-key fixture, full typed data, both intermediate hashes, digest and signature.
 
-Solidity fixture evaluation for P9.6 must reconstruct the domain separator and
-struct hash above, compare them to the JSON values, then evaluate
-`ECDSA.recover(digest, signature) == signer`. This fixture is specified but has not
-been executed in Solidity; no test files or test cases were added under repository
-policy. P9.0b's cross-language acceptance criterion therefore remains outstanding.
+P9.7a now exercises this public TypeScript fixture through the actual Solidity
+campaign digest implementation and verifies `ECDSA.recover(digest, signature) ==
+signer`. The focused check passes, closing P9.0b's local cross-language criterion.
 
 Issuance policy: after verified proof and atomic challenge/identity binding, issue
 a random bytes32 nonce and deadline no more than five minutes in the future (and
@@ -117,6 +118,6 @@ enforced separately on chain in P9.7.
 ## Evidence boundary
 
 P9.1–P9.3 implementation is present. Real portal configuration, opening the widget,
-staging scope behavior, wallet substitution execution and Solidity signature
-fixture execution are not claimed. Funding stays fail-closed in the existing
-contract. P9.4 and later are intentionally outside this implementation.
+staging scope behavior are not claimed. Local backend wallet-substitution and
+Solidity signature fixture checks now pass in the follow-up. Existing deployed
+contracts are unchanged; new source contracts require deployment before use.

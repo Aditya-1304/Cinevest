@@ -9,6 +9,11 @@ interface ICampaignFactory {
     /// @notice Creates a campaign with immutable terms and returns its deployed address.
     function createCampaign(CampaignTypes.CampaignTerms calldata terms) external returns (address);
 
+    /// @notice Sets the deployment's backend verifier key once, before creating gated campaigns.
+    function configureWorldVerifierSigner(address signer) external;
+    function worldVerifierSigner() external view returns (address);
+    function worldVerifierAdmin() external view returns (address);
+
     /// @notice Confirms that an address was created by this factory.
     function isCampaign(address campaign) external view returns (bool);
 

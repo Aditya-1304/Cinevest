@@ -32,6 +32,7 @@ contract CampaignCreationTest {
     function setUp() external {
         vm.chainId(CampaignTypes.ARC_TESTNET_CHAIN_ID);
         factory = new CampaignFactory();
+        factory.configureWorldVerifierSigner(address(0x1234));
         terms = CampaignTypes.CampaignTerms({
             creator: CREATOR,
             reviewer: REVIEWER,

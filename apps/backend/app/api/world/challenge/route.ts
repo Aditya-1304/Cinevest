@@ -13,6 +13,6 @@ export async function POST(request: Request) {
   try {
     return NextResponse.json(await issueWorldChallenge(session.address, input), { headers: { "cache-control": "no-store" } });
   } catch {
-    return NextResponse.json({ error: "World challenge configuration unavailable" }, { status: 503 });
+    return NextResponse.json({ error: "World challenge service unavailable" }, { status: 503 });
   }
 }
