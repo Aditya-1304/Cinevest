@@ -1,0 +1,6 @@
+import { getDemoFilm } from "@/lib/demo-films";
+import { redirect } from "next/navigation";
+import { isAddress } from "viem";
+import { AppShell } from "@/components/shell/app-shell";
+import { getDemoFilm as lookupDemoFilm } from "@/lib/demo-films";
+import { demoFilmPath, watchPath } from "@/lib/paths";
