@@ -40,6 +40,7 @@ contract CampaignLifecycleTest {
             worldGated: false,
             perHumanLimit: 0
         });
+        vm.prank(CREATOR);
         campaign = Campaign(factory.createCampaign(terms));
     }
 

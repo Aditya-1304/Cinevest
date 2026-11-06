@@ -1,0 +1,29 @@
+{
+  "checkedAt": "2026-11-06T07:22:25.206Z",
+  "checks": {
+    "database": {
+      "status": "passed",
+      "migrations": "applied",
+      "atomicTransition": true
+    },
+    "arc": {
+      "status": "passed",
+      "chainId": 5042002,
+      "usdcDecimals": 6,
+      "factoryDeployed": true,
+      "factoryMatchesBuild": true,
+      "factoryRuntimeMatchesManifest": true
+    },
+    "arkiv": {
+      "status": "passed",
+      "chainId": 7794095,
+      "realSchemaQuery": true,
+      "returnedRows": 0,
+      "creatorWrite": "requires wallet signature"
+    },
+    "swarm": {
+      "status": "not-configured",
+      "reason": "Bee uploader and usable postage batch required"
+    }
+  }
+}

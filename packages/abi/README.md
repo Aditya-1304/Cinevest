@@ -3,6 +3,10 @@
 Both applications depend on `@cinevest/abi`. Import `campaignAbi`,
 `campaignFactoryAbi`, and `erc20Abi` from that package for viem/wagmi clients.
 Import `arcTestnetDeployment` for the confirmed factory address and chain ID.
+Its `compatible` flag must be true before treating that address as the current
+compiled revision. `ARC_TESTNET`, `ARC_TESTNET_USDC`, `ARC_TESTNET_DEPLOYMENT`,
+`CampaignTerms`, and `campaignTermsDigest` provide the shared typed network and
+immutable-term boundaries used by the backend.
 These exports retain literal TypeScript types, including campaign term tuples.
 For other tools and languages, use the JSON arrays in `abi/`, also exported as
 `@cinevest/abi/Campaign.json`, `@cinevest/abi/CampaignFactory.json`, and

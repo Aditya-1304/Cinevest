@@ -9,10 +9,12 @@ import { CampaignTypes } from "./CampaignTypes.sol";
 import { ICampaignEvents } from "./interfaces/ICampaign.sol";
 
 /// @notice Per-film campaign exposing immutable terms and the lifecycle stage.
-/// @dev Terms are written once at construction; funding, escrow, and viewing actions are added by their own slices.
+/// @dev Arc owns financial authority; playback hashes commit an asset identifier, not provider availability.
 contract Campaign is ICampaignEvents, ReentrancyGuard {
     /// @dev Milestone release schedule is fixed at three cumulative 40/70/100 percent steps of the goal.
     uint256 private constant MAX_TRANCHE_INDEX = 2;
+    /// @notice After this fixed grace period anyone may recover unspent escrow if the reviewer disappears.
+    uint256 public constant CANCELLATION_GRACE_PERIOD = 7 days;
 
     CampaignTypes.CampaignTerms private _terms;
     CampaignTypes.Stage private _stage;
@@ -122,7 +124,7 @@ contract Campaign is ICampaignEvents, ReentrancyGuard {
         if (index == 2 && livepeerPlaybackIdHash == bytes32(0)) {
             revert CampaignTypes.PlaybackReferenceRequired();
         }
-        if (index == 2 && withdrawableTrancheAmount() < _cumulativeTrancheAmount(1)) {
+        if (index == 2 && (_approvedTrancheCount < 2 || withdrawableTrancheAmount() < _cumulativeTrancheAmount(1))) {
             revert CampaignTypes.MilestoneNotOpen(index);
         }
         bytes32 actualEvidenceHash = _evidence[index];
@@ -162,6 +164,7 @@ contract Campaign is ICampaignEvents, ReentrancyGuard {
         _paidTrancheAmount = eligible;
         SafeERC20.safeTransfer(IERC20(_terms.usdc), _terms.creator, amount);
         emit ClaimPaid(_terms.creator, amount);
+        emit PayoutPaid(_terms.creator, PayoutKind.ProductionTranche, amount);
     }
 
     /// @notice Opens a challenge against the current milestone evidence for an original contributor.
@@ -230,6 +233,17 @@ contract Campaign is ICampaignEvents, ReentrancyGuard {
     /// @notice Returns failed-funding principal or the wallet's share of cancelled production escrow.
     /// @dev Clears the wallet's units before transferring USDC, so a repeated claim finds nothing owed.
     function claimFundingRefund() external nonReentrant {
+        _claimPrincipalRefund();
+    }
+
+    /// @notice Explicit cancellation-only claim entrypoint for clients that distinguish refund categories.
+    function claimCancelledEscrow() external nonReentrant {
+        if (_stage != CampaignTypes.Stage.CancelledProduction) revert CampaignTypes.RefundStageRequired();
+        _claimPrincipalRefund();
+    }
+
+    /// @dev Both public refund entrypoints share one checks-effects-interactions settlement path.
+    function _claimPrincipalRefund() private {
         if (
             _stage != CampaignTypes.Stage.Refundable
                 && _stage != CampaignTypes.Stage.CancelledProduction
@@ -245,11 +259,13 @@ contract Campaign is ICampaignEvents, ReentrancyGuard {
         _refundsPaid += amount;
         SafeERC20.safeTransfer(IERC20(_terms.usdc), msg.sender, amount);
         emit ClaimPaid(msg.sender, amount);
+        emit PayoutPaid(msg.sender, _stage == CampaignTypes.Stage.Refundable ? PayoutKind.FundingRefund : PayoutKind.CancelledEscrow, amount);
     }
 
-    /// @notice Lets the reviewer cancel production after its immutable deadline and refund remaining escrow pro rata.
+    /// @notice Cancels unfinished production at its deadline for the reviewer, or after seven days for anyone.
+    /// @dev The permissionless fallback snapshots the same unspent pool and cannot cancel a released film.
     function cancelProduction() external {
-        if (msg.sender != _terms.reviewer) revert CampaignTypes.ReviewerOnly();
+        if (msg.sender != _terms.reviewer && block.timestamp < uint256(_terms.productionDeadline) + CANCELLATION_GRACE_PERIOD) revert CampaignTypes.ReviewerOnly();
         if (_stage != CampaignTypes.Stage.Production) {
             revert CampaignTypes.ProductionStageRequired();
         }
@@ -274,6 +290,7 @@ contract Campaign is ICampaignEvents, ReentrancyGuard {
             revert CampaignTypes.EvidenceLocked(2);
         }
         livepeerPlaybackIdHash = playbackIdHash;
+        emit ReleaseConfigured(playbackIdHash);
     }
 
     /// @notice Publishes the reviewed film and starts its release-relative revenue term.
@@ -341,6 +358,7 @@ contract Campaign is ICampaignEvents, ReentrancyGuard {
         funderClaimed += amount;
         SafeERC20.safeTransfer(IERC20(_terms.usdc), msg.sender, amount);
         emit ClaimPaid(msg.sender, amount);
+        emit PayoutPaid(msg.sender, PayoutKind.FunderRevenue, amount);
     }
 
     /// @notice Withdraws only credited creator viewing revenue, independently of production escrow.
@@ -351,6 +369,7 @@ contract Campaign is ICampaignEvents, ReentrancyGuard {
         creatorClaimed += amount;
         SafeERC20.safeTransfer(IERC20(_terms.usdc), msg.sender, amount);
         emit ClaimPaid(msg.sender, amount);
+        emit PayoutPaid(msg.sender, PayoutKind.CreatorRevenue, amount);
     }
 
     function hasPaidAccess(address wallet) external view returns (bool) {

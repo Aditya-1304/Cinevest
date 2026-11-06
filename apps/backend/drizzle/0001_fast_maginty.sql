@@ -1,0 +1,1 @@
+ALTER TABLE "workflow_operations" ADD COLUMN "terms_json" text;

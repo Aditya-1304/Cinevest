@@ -187,6 +187,16 @@ export const campaignFactoryAbi = [
   },
   {
     "type": "error",
+    "name": "CreatorOnly",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CreatorRequired",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "UnsupportedChain",
     "inputs": [
       {

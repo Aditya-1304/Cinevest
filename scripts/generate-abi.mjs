@@ -1,4 +1,5 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { keccak256 } from 'viem';
 
 /** Export compiler ABIs without maintaining a second, manually edited contract interface. */
 for (const [contract, name] of [['Campaign', 'campaign'], ['CampaignFactory', 'campaignFactory'], ['IERC20', 'erc20']]) {
@@ -10,9 +11,13 @@ for (const [contract, name] of [['Campaign', 'campaign'], ['CampaignFactory', 'c
 let deploymentExport = '';
 try {
   const deployment = JSON.parse(await readFile('contracts/deployments/arc-testnet.json', 'utf8'));
+  const factory = JSON.parse(await readFile('contracts/out/CampaignFactory.sol/CampaignFactory.json', 'utf8'));
+  deployment.creationBytecodeHash ??= null;
+  deployment.runtimeCodeHash ??= null;
+  deployment.compatible = deployment.creationBytecodeHash === keccak256(factory.bytecode.object);
   await writeFile('packages/abi/src/deployment.ts', `/** Confirmed Arc Testnet factory deployment; individual films use their own campaign addresses. */\nexport const arcTestnetDeployment = ${JSON.stringify(deployment, null, 2)} as const;\n`);
   deploymentExport = 'export { arcTestnetDeployment } from "./deployment";\n';
 } catch (error) {
   if (error.code !== 'ENOENT') throw error;
 }
-await writeFile('packages/abi/src/index.ts', '/** Shared compiler-generated interfaces for browser and server contract clients. */\nexport { campaignAbi } from "./campaign";\nexport { campaignFactoryAbi } from "./campaignFactory";\nexport { erc20Abi } from "./erc20";\n' + deploymentExport);
+await writeFile('packages/abi/src/index.ts', '/** Shared compiler-generated interfaces for browser and server contract clients. */\nexport { campaignAbi } from "./campaign";\nexport { campaignFactoryAbi } from "./campaignFactory";\nexport { erc20Abi } from "./erc20";\nexport { ARC_TESTNET, ARC_TESTNET_USDC, ARC_TESTNET_DEPLOYMENT, type CampaignTerms } from "./config";\nexport { campaignTermsDigest } from "./campaign-terms-digest";\n' + deploymentExport);

@@ -43,6 +43,8 @@ interface ICampaign {
 
     /// @notice Returns failed-funding principal or the wallet's share of cancelled production escrow.
     function claimFundingRefund() external;
+    /// @notice Claims only the contributor's share of the fixed unspent cancellation pool.
+    function claimCancelledEscrow() external;
 
     /// @notice Cancels production after the immutable deadline and opens remaining escrow to pro-rata claims.
     function cancelProduction() external;
@@ -114,6 +116,11 @@ interface ICampaign {
 /// @notice Canonical lifecycle events of one film campaign; this frozen ABI is what the web app reads.
 /// @dev Actions implemented in later slices emit these signatures exactly; do not reshape them per phase.
 interface ICampaignEvents {
+    /// @notice Distinguishes principal and revenue payouts while preserving the legacy ClaimPaid event.
+    enum PayoutKind { FundingRefund, ProductionTranche, FunderRevenue, CreatorRevenue, CancelledEscrow }
+    event PayoutPaid(address indexed claimant, PayoutKind indexed kind, uint256 amount);
+    /// @notice Commits the configured playback identifier; availability is checked offchain before review.
+    event ReleaseConfigured(bytes32 indexed playbackIdHash);
     event FilmReleased(bytes32 indexed playbackIdHash, uint256 releasedAt);
 
     /// @notice Accepted contribution while funding; `totalRaised` is the campaign's cumulative principal.

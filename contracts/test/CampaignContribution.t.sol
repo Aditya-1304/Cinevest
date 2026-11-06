@@ -38,7 +38,7 @@ contract MockUSDC {
         allowance[msg.sender][spender] = amount;
     }
 
-    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) public virtual returns (bool) {
         if (failMode == 1) revert("MockUSDC: transfer failed");
         uint256 allowed = allowance[from][msg.sender];
         require(allowed >= amount, "MockUSDC: allowance");
@@ -48,7 +48,7 @@ contract MockUSDC {
         return failMode != 2;
     }
 
-    function transfer(address to, uint256 amount) external returns (bool) {
+    function transfer(address to, uint256 amount) public virtual returns (bool) {
         if (failMode == 1) revert("MockUSDC: transfer failed");
         balanceOf[msg.sender] -= amount;
         balanceOf[to] += amount;
@@ -93,6 +93,7 @@ contract CampaignContributionTest {
             worldGated: false,
             perHumanLimit: 0
         });
+        vm.prank(CREATOR);
         campaign = Campaign(factory.createCampaign(terms));
     }
 
@@ -218,6 +219,7 @@ contract CampaignContributionTest {
 
     function test_WorldGatedCampaignRejectsPermissionlessContribution() external {
         terms.worldGated = true;
+        vm.prank(CREATOR);
         Campaign gated = Campaign(factory.createCampaign(terms));
         MockUSDC(CampaignTypes.ARC_TESTNET_USDC).mint(ALICE, GOAL);
         vm.prank(ALICE);

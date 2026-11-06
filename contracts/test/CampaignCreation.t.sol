@@ -7,6 +7,7 @@ import { CampaignTypes } from "../src/CampaignTypes.sol";
 
 /// @notice Minimal cheatcode surface for the focused campaign tests; the repo carries no forge-std dependency.
 interface Cheats {
+    function prank(address) external;
     function chainId(uint256) external;
     function getNonce(address) external view returns (uint64);
     function computeCreateAddress(address, uint256) external pure returns (address);
@@ -49,6 +50,7 @@ contract CampaignCreationTest {
     }
 
     function test_FreshCampaignReportsFundingAndFullTerms() external {
+        vm.prank(CREATOR);
         address campaignAddress = factory.createCampaign(terms);
         Campaign campaign = Campaign(campaignAddress);
         require(campaign.getStage() == CampaignTypes.Stage.Funding, "wrong fresh stage");
@@ -62,6 +64,7 @@ contract CampaignCreationTest {
         address expected = vm.computeCreateAddress(address(factory), vm.getNonce(address(factory)));
         vm.expectEmit(true, true, false, true, address(factory));
         emit CampaignCreated(CREATOR, expected);
+        vm.prank(CREATOR);
         address campaign = factory.createCampaign(terms);
         require(campaign == expected, "campaign address mismatch");
         require(Campaign(campaign).getTerms().creator == CREATOR, "creator mismatch");
@@ -71,6 +74,7 @@ contract CampaignCreationTest {
         CampaignTypes.CampaignTerms memory bad = terms;
         bad.usdc = address(1);
         vm.expectRevert(abi.encodeWithSelector(CampaignTypes.TokenUnsupported.selector));
+        vm.prank(CREATOR);
         factory.createCampaign(bad);
     }
 
@@ -78,6 +82,7 @@ contract CampaignCreationTest {
         CampaignTypes.CampaignTerms memory bad = terms;
         bad.creator = address(0);
         vm.expectRevert(abi.encodeWithSelector(CampaignTypes.CreatorRequired.selector));
+        vm.prank(CREATOR);
         factory.createCampaign(bad);
     }
 
