@@ -621,6 +621,8 @@ Cinevest/
 
 ### Phase 9 — World IDKit and enforced fair funding (A+B)
 
+Implementation evidence for P9.0a–P9.3: see `docs/world/phase-9-setup.md`. The challenge page, server RP signing, wallet-bound context checks and EIP-712 encoding/vector are implemented. Live staging/widget evidence and Solidity fixture execution remain unverified; checklist acceptance is not claimed from build/typecheck alone.
+
 - [ ] **P9.0a (Both) [NEW]:** Validate current World IDKit proof type, stable action/campaign-scoped nullifier and wallet signal with a real staging proof before finalizing semantics. **Done:** two wallets/same human and fresh challenge produce the expected scope behavior, or limitation is disclosed.
 - [ ] **P9.0b (A+B) [NEW]:** Specify EIP-712 domain/message encoding, `worldVerifierSigner` creation policy, nonce consumption and contract/TypeScript test vectors before implementing the verifier. **Done:** a signature produced in TypeScript verifies against Solidity fixtures.
 - [ ] **P9.1 (B):** Configure official IDKit app/RP action and proof challenge page. **Done:** mock verification flow opens.
